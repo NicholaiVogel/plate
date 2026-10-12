@@ -220,7 +220,7 @@ mod tests {
         assert!(!cache.contains((9, 0)), "frame 0 left RAM");
         let disk = cache.disk().unwrap();
         for _ in 0..200 {
-            if disk.contains((9, 0)) {
+            if disk.contains((9, 0)) && disk.contains((9, 1)) {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(5));

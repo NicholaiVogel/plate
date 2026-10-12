@@ -541,7 +541,7 @@ impl Plate {
                     div()
                         .flex()
                         .gap(s(10.))
-                        .child(div().w(s(110.)).font_family(theme::font_mono()).text_size(s(11.)).text_color(theme::blue()).child(*k))
+                        .child(div().w(s(110.)).font_family(theme::font_mono()).text_size(s(11.)).text_color(theme::blue()).child(crate::actions::shortcut_label(k)))
                         .child(div().flex_1().text_size(s(12.)).text_color(theme::ink_muted()).child(*what)),
                 );
             }

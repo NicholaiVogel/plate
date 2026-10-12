@@ -3,6 +3,7 @@ name = "plate"
 version.workspace = true
 edition.workspace = true
 description = "A color-managed media player for VFX review"
+build = "../../packaging/macos-rpath.rs"
 
 [[bin]]
 name = "plate"
@@ -24,3 +25,13 @@ clap = { version = "4", features = ["derive"] }
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Compile Metal shaders at startup, so Command Line Tools are sufficient.
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui = { version = "0.2.2", features = ["runtime_shaders"] }
+objc = "0.2"
+cocoa = "0.26"
+raw-window-handle = "0.6"
+
+[build-dependencies]
+pkg-config = "0.3"

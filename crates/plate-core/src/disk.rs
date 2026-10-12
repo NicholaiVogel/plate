@@ -249,7 +249,16 @@ fn sweep_stale(location: &Path) {
     for entry in rd.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         let Some(pid) = name.strip_prefix(SESSION_PREFIX).and_then(|p| p.parse::<u32>().ok()) else { continue };
-        let alive = Path::new(&format!("/proc/{pid}")).exists() && pid != std::process::id();
+        // Signal 0 checks existence without sending a signal. Unlike /proc,
+        // this also works on macOS. Only ESRCH proves the process is gone.
+        let Ok(pid_arg) = i32::try_from(pid) else { continue };
+        if pid_arg <= 0 {
+            continue;
+        }
+        // SAFETY: a positive PID and signal 0 do not modify the process.
+        let exists = unsafe { libc::kill(pid_arg, 0) } == 0
+            || std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH);
+        let alive = exists && pid != std::process::id();
         if !alive {
             let _ = std::fs::remove_dir_all(entry.path());
         }
@@ -259,6 +268,23 @@ fn sweep_stale(location: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sweep_preserves_another_live_session() {
+        let mut child = std::process::Command::new("sleep").arg("30").spawn().unwrap();
+        let loc = std::env::temp_dir().join(format!("plate-sweep-test-{}", std::process::id()));
+        let live = loc.join(format!("{SESSION_PREFIX}{}", child.id()));
+        std::fs::create_dir_all(&live).unwrap();
+        sweep_stale(&loc);
+        let preserved = live.exists();
+        child.kill().unwrap();
+        child.wait().unwrap();
+        sweep_stale(&loc);
+        let removed = !live.exists();
+        let _ = std::fs::remove_dir_all(&loc);
+        assert!(preserved, "must not delete a running player's cache");
+        assert!(removed, "must remove the cache after its process exits");
+    }
 
     #[test]
     fn round_trips_and_cleans_up() {

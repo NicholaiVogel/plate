@@ -1015,6 +1015,7 @@ impl Plate {
         }
         self.presenter.clear();
         let clip = self.make_clip(source);
+        log::info!("opened {} ({}x{}, {} frames)", clip.info.path.display(), clip.info.width, clip.info.height, clip.info.frame_count);
         self.prefs.push_recent(&clip.info.path.to_string_lossy());
         self.prefs.save();
         self.audio.set_track(clip.source.audio());

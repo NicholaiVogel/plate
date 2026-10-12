@@ -344,8 +344,7 @@ impl Render for Plate {
                 this.focus_viewer(window);
             }))
             .drag_over::<ExternalPaths>(|s, _, _, _| s.bg(theme::structure()))
-            // Scrubbing follows the mouse anywhere in the window, not just
-            // while the pointer stays over the thin timeline.
+            // Inline exposure/gamma sliders keep their upstream drag behavior.
             .on_mouse_move(cx.listener(|this, ev: &gpui::MouseMoveEvent, _, cx| {
                 if let Drag::Slider(kind) = this.drag {
                     if ev.pressed_button != Some(MouseButton::Left) {
@@ -355,18 +354,6 @@ impl Render for Plate {
                     this.slide_to(kind, ev.position.x, ev.modifiers.shift);
                     cx.notify();
                     return;
-                }
-                if matches!(this.drag, Drag::Scrub) {
-                    if ev.pressed_button != Some(MouseButton::Left) {
-                        this.drag = Drag::None;
-                        return;
-                    }
-                    if let Some(f) = this.frame_at(ev.position.x) {
-                        if f != this.frame {
-                            this.seek(f);
-                            cx.notify();
-                        }
-                    }
                 }
             }))
             .on_mouse_up(MouseButton::Left, cx.listener(|this, _, _, cx| {

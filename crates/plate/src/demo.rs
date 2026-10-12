@@ -8,6 +8,38 @@ use plate_core::notes::{Comment, Shape};
 use std::time::Duration;
 
 pub fn schedule(window: &mut Window, cx: &mut Context<Plate>) {
+    #[cfg(target_os = "macos")]
+    if std::env::var_os("PLATE_CHECK_SCRUB").is_some() {
+        // Exercise the painted timeline's actual GPUI event handlers. This
+        // runs in a real window without requiring OS input permissions.
+        cx.spawn_in(window, async move |this, cx| {
+            cx.background_executor().timer(Duration::from_secs(2)).await;
+            let (bounds, count) = this.update_in(cx, |app, _, _| {
+                (app.timeline_bounds.get(), app.clip.as_ref().expect("test clip").info.frame_count)
+            }).unwrap();
+            assert!(count > 1, "scrubbing check requires a movie or image sequence");
+            cx.update(|window, _| crate::macos::check_header(window)).unwrap();
+            assert!(f32::from(bounds.size.width) > 100.0, "timeline must be painted");
+            let start = point(bounds.origin.x + bounds.size.width * 0.1, bounds.center().y);
+            let end = point(bounds.origin.x + bounds.size.width * 0.75, bounds.center().y);
+            let outside = cx.update(|window, _| point(window.viewport_size().width + px(100.), start.y)).unwrap();
+            let before = point(px(-100.), start.y);
+            for (end, expected) in [(end, (count as f64 * 0.75).floor() as u64), (outside, count - 1), (before, 0)] {
+                // NSEventType: moved, left down, left dragged, left up.
+                for (event_type, position) in [(5, start), (1, start), (6, end), (2, end)] {
+                    cx.update(|window, _| crate::macos::check_mouse_event(window, event_type, position)).unwrap();
+                    cx.background_executor().timer(Duration::from_millis(100)).await;
+                }
+                this.update_in(cx, |app, _, _| {
+                    assert_eq!(app.frame, expected, "drag must seek to the cursor's frame, including outside the window");
+                    assert!(matches!(app.drag, crate::app::Drag::None), "release must end the scrub");
+                    assert!(!app.is_playing(), "scrubbing must pause playback");
+                    println!("PASS: timeline drag seeks to frame {} of {count}", app.frame);
+                }).unwrap();
+            }
+            cx.update(|_, cx| cx.quit()).unwrap();
+        }).detach();
+    }
     let Ok(state) = std::env::var("PLATE_DEMO") else { return };
     // Steps run in order; "wait:<ms>" pauses between them.
     cx.spawn_in(window, async move |this, cx| {
