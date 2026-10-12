@@ -18,6 +18,7 @@ impl Plate {
             Modal::Settings => ("Settings", 560., self.modal_settings(cx).into_any_element()),
             Modal::Help => ("Shortcuts", 720., self.modal_help().into_any_element()),
             Modal::Layers => ("Layers", 460., self.modal_layers(cx).into_any_element()),
+            Modal::Versions => ("Versions", 520., self.modal_versions(cx).into_any_element()),
             Modal::Guides => ("Guides", 520., self.modal_guides(cx).into_any_element()),
             Modal::Captions => ("Captions", 480., self.modal_captions(cx).into_any_element()),
             Modal::TextAnnotation => ("Text annotation", 420., self.modal_text().into_any_element()),
@@ -589,6 +590,60 @@ fn mode_button_owned(id: SharedString, label: String, selected: bool) -> gpui::S
 }
 
 impl Plate {
+    fn modal_versions(&mut self, cx: &mut Context<Self>) -> Div {
+        let (list, at) = self.versions();
+        if list.is_empty() {
+            return div().p(s(16.)).text_size(s(12.)).text_color(theme::ink_faint()).child("No other versions of this clip in its folder. Versions are found by a v001-style token in the name.");
+        }
+        let now = std::time::SystemTime::now();
+        let mut rows = div().id("version-list").max_h(s(420.)).overflow_y_scroll().p(s(6.)).flex().flex_col();
+        for (i, (v, entry)) in list.iter().enumerate().rev() {
+            let selected = Some(i) == at;
+            let age = std::fs::metadata(&entry.path)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| now.duration_since(t).ok())
+                .map(|d| match d.as_secs() {
+                    0..=59 => "just now".to_string(),
+                    60..=3599 => format!("{}m ago", d.as_secs() / 60),
+                    3600..=86_399 => format!("{}h ago", d.as_secs() / 3600),
+                    s => format!("{}d ago", s / 86_400),
+                })
+                .unwrap_or_default();
+            let e = entry.clone();
+            rows = rows.child(
+                row(("version", i), selected)
+                    .child(div().w(s(44.)).font_family(FONT_MONO).text_size(s(12.)).text_color(if selected { theme::blue() } else { theme::ink() }).child(format!("v{v:03}")))
+                    .child(div().flex_1().min_w_0().text_size(s(12.)).text_color(theme::ink_muted()).whitespace_nowrap().overflow_hidden().text_ellipsis().child(scan_name(entry)))
+                    .child(tag(age.to_uppercase()))
+                    .when(selected, |d| d.child(icon("check").text_color(theme::blue())))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_version(&e, cx);
+                        this.close_modal(window, cx);
+                    })),
+            );
+        }
+        div()
+            .flex()
+            .flex_col()
+            .child(rows)
+            .child(
+                div()
+                    .px(s(14.))
+                    .py(s(10.))
+                    .border_t_1()
+                    .border_color(theme::hairline())
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .child(tag("ALT ↑ ↓ STEPS VERSIONS ON THE SAME FRAME"))
+                    .child(primary_button("compare-prev", "Compare with previous").on_click(cx.listener(|this, _, window, cx| {
+                        this.close_modal(window, cx);
+                        this.compare_previous(cx);
+                    }))),
+            )
+    }
+
     fn modal_layers(&mut self, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
         let (layers, current) = self
             .clip
@@ -841,4 +896,8 @@ fn set_disk_gb(this: &mut Plate, gb: f32, cx: &mut Context<Plate>) {
         this.apply_disk_cache();
     }
     cx.notify();
+}
+
+fn scan_name(e: &plate_core::scan::BinEntry) -> String {
+    plate_core::scan::version_name(e)
 }

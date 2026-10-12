@@ -45,6 +45,7 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                     "help" => Modal::Help,
                     "guides" => Modal::Guides,
                     "layers" => Modal::Layers,
+                    "versions" => Modal::Versions,
                     "captions" => Modal::Captions,
                     _ => continue,
                 };
@@ -123,6 +124,18 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 window.bounds().size
             ),
             "quit" => cx.quit(),
+            "older" => app.step_version(-1, cx),
+            "newer" => app.step_version(1, cx),
+            "compare_prev" => app.compare_previous(cx),
+            "expand_all" => {
+                if let Some(b) = &app.bin {
+                    for e in &b.entries {
+                        if let Some((k, _)) = plate_core::scan::version_of(&plate_core::scan::version_name(e)) {
+                            app.expanded_stacks.insert(k);
+                        }
+                    }
+                }
+            }
             "layer" => app.switch_layer(arg),
             "wait" => {}
             "toast" => app.show_toast("Saved /tmp/frame_1012.png".into()),

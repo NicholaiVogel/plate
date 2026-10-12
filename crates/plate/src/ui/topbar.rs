@@ -1,4 +1,4 @@
-use super::widgets::{chip, icon_button, segmented, tag};
+use super::widgets::{chip, icon_button, icon_sized, segmented, tag, TipExt};
 use crate::app::{CompareMode, Modal, Plate, SliderKind};
 use crate::theme::{self, s, FONT_MONO};
 use gpui::{div, prelude::*, Context, FontWeight, Window};
@@ -20,6 +20,10 @@ impl Plate {
             parts.join("  ·  ")
         });
 
+        let version_pill = {
+            let (list, at) = self.versions();
+            at.filter(|_| list.len() > 1).map(|i| (format!("v{:03}", list[i].0), list.len()))
+        };
         let mut controls = div().flex().flex_none().items_center().gap(s(6.));
         if let Some(c) = clip {
             let view = format!("{} · {}", short_display(&c.choice.display), c.choice.view);
@@ -121,6 +125,7 @@ impl Plate {
                             .flex()
                             .flex_col()
                             .min_w_0()
+                            .flex_shrink()
                             .child(
                                 div()
                                     .font_weight(FontWeight::MEDIUM)
@@ -132,7 +137,27 @@ impl Plate {
                             )
                             .child(tag(meta.unwrap_or_default()).whitespace_nowrap().overflow_hidden().text_ellipsis()),
                         None => div().text_color(theme::ink_faint()).text_size(s(13.)).child("No media"),
-                    }),
+                    })
+                    .children(version_pill.map(|(label, count)| {
+                        div()
+                            .id("version-pill")
+                            .flex_none()
+                            .h(s(22.))
+                            .px(s(8.))
+                            .flex()
+                            .items_center()
+                            .gap(s(6.))
+                            .rounded(s(theme::RADIUS))
+                            .border_1()
+                            .border_color(theme::hairline())
+                            .cursor_pointer()
+                            .hover(|st| st.bg(theme::hover()))
+                            .child(div().font_family(FONT_MONO).text_size(s(12.)).child(label))
+                            .child(tag(format!("OF {count}")))
+                            .child(icon_sized("chevron-down", 12.).text_color(theme::ink_faint()))
+                            .tip("Versions  (V · Alt ↑ ↓ to step · Shift V to compare)")
+                            .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Versions, window, cx)))
+                    })),
             )
             .child(controls)
     }

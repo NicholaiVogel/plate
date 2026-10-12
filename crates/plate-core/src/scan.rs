@@ -276,6 +276,58 @@ pub fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
+/// A version token in a name: `_v009`, `.V12.`, `-v3_comp`. The token must
+/// stand alone (separator or end on both sides), so `v1rough` isn't one.
+/// Returns the name with the last such token replaced by `v#` (the stack
+/// key) and the version number.
+pub fn version_of(name: &str) -> Option<(String, u32)> {
+    let b = name.as_bytes();
+    let is_sep = |c: u8| matches!(c, b'_' | b'.' | b'-' | b' ');
+    let mut found = None;
+    let mut i = 0;
+    while i < b.len() {
+        if (b[i] == b'v' || b[i] == b'V') && (i == 0 || is_sep(b[i - 1])) {
+            let mut j = i + 1;
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+            if j > i + 1 && (j == b.len() || is_sep(b[j])) {
+                found = Some((i, j));
+            }
+            i = j.max(i + 1);
+        } else {
+            i += 1;
+        }
+    }
+    let (start, end) = found?;
+    let number: u32 = name[start + 1..end].parse().ok()?;
+    Some((format!("{}v#{}", &name[..start], &name[end..]), number))
+}
+
+/// The name versions are compared by: the file name, or a sequence's pattern.
+pub fn version_name(entry: &BinEntry) -> String {
+    match &entry.kind {
+        EntryKind::Sequence(seq) => seq.pattern(),
+        _ => entry.name.clone(),
+    }
+}
+
+/// All versions of `entry` among `entries` (same stack key and kind),
+/// oldest first. Just the entry itself when it isn't versioned.
+pub fn versions_in<'a>(entries: &'a [BinEntry], name: &str) -> Vec<(u32, &'a BinEntry)> {
+    let Some((key, _)) = version_of(name) else { return Vec::new() };
+    let mut out: Vec<(u32, &BinEntry)> = entries
+        .iter()
+        .filter(|e| e.is_playable())
+        .filter_map(|e| {
+            let (k, v) = version_of(&version_name(e))?;
+            (k == key).then_some((v, e))
+        })
+        .collect();
+    out.sort_by_key(|(v, _)| *v);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307,6 +359,17 @@ mod tests {
         };
         assert_eq!(s.path_for(12), PathBuf::from("/x/a.0012.exr"));
         assert_eq!(s.pattern(), "a.####.exr");
+    }
+
+    #[test]
+    fn versions() {
+        assert_eq!(version_of("SXRS_026B_v1rough_v009.mp4"), Some(("SXRS_026B_v1rough_v#.mp4".into(), 9)));
+        assert_eq!(version_of("shot_V012.####.exr"), Some(("shot_v#.####.exr".into(), 12)));
+        assert_eq!(version_of("plate_v3_comp.mov"), Some(("plate_v#_comp.mov".into(), 3)));
+        assert_eq!(version_of("v2.mov"), Some(("v#.mov".into(), 2)));
+        assert_eq!(version_of("SXRS_026B_v1rough.mp4"), None);
+        assert_eq!(version_of("dev.mov"), None);
+        assert_eq!(version_of("review.mp4"), None);
     }
 
     #[test]

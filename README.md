@@ -60,6 +60,22 @@ follows the disk live: new renders, deleted versions and copied-in files show
 up as they happen, and a sequence that grows while it's open (a render in
 progress) extends in place without losing the frame, cache or notes.
 
+## Versions and layers
+
+- Versions: files that differ only by a standalone version token
+  (`shot_v001.mov` … `shot_v009.mov`, `comp.v12.####.exr`) stack into one bin
+  row showing the latest, expandable to the rest. `v1rough`-style milestone
+  names aren't mistaken for versions. `Alt ↑/↓` steps older/newer on the same
+  frame, keeping zoom, pan, range, layer and playback; `V` lists versions with
+  their age; `Shift V` wipes against the previous version. A new version
+  landing on disk gets a toast.
+- Multi-layer EXR: layers are found from channel names (`R G B A`,
+  `layer.R`, Nuke's `layer.red`, Blender's `ViewLayer.Pass.R`, single-channel
+  and XYZ data passes) across all parts of multi-part files, beauty first. A
+  Layer control appears in the top bar; `Alt ←/→` steps layers. Only the
+  chosen layer's channels are read, each layer caches separately, and the
+  choice carries over to other files and versions that have the layer.
+
 ## Guides and captions
 
 - Guides (grid button, `'` to show/hide): rule of thirds, center cross, action

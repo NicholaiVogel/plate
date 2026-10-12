@@ -115,6 +115,7 @@ pub enum Modal {
     Help,
     TextAnnotation,
     Layers,
+    Versions,
     Guides,
     Captions,
 }
@@ -305,6 +306,13 @@ pub struct Plate {
     pub annotation_input: Entity<TextInput>,
     pub toast: Option<Toast>,
 
+    /// Version stacks expanded in the bin, by stack key.
+    pub expanded_stacks: HashSet<String>,
+    /// Highest version seen per stack, to announce new ones.
+    version_seen: HashMap<String, u32>,
+    /// Bumped whenever the bin's entries change; keys the versions memo.
+    bin_generation: u64,
+    versions_memo: std::cell::RefCell<Option<(u64, u64, Vec<(u32, BinEntry)>, Option<usize>)>>,
     /// The EXR layer last chosen, carried to other files that have it.
     pub layer_pref: Option<String>,
     /// While a new layer decodes, the previous layer's image stays up.
@@ -401,6 +409,10 @@ impl Plate {
             search_input,
             annotation_input,
             toast: None,
+            expanded_stacks: HashSet::new(),
+            version_seen: HashMap::new(),
+            bin_generation: 0,
+            versions_memo: std::cell::RefCell::new(None),
             layer_pref: None,
             stale_from: None,
             captions: None,
@@ -526,9 +538,122 @@ impl Plate {
         }
     }
 
+    /// The version-comparable name of the open clip.
+    pub fn clip_version_name(&self) -> Option<String> {
+        let clip = self.clip.as_ref()?;
+        Some(match clip.info.kind {
+            MediaKind::Sequence => clip.info.name.split(" [").next().unwrap_or(&clip.info.name).to_string(),
+            _ => clip.info.path.file_name()?.to_string_lossy().to_string(),
+        })
+    }
+
+    /// Versions of the open clip in its folder, oldest first, and the index
+    /// of the open one.
+    pub fn versions(&self) -> (Vec<(u32, BinEntry)>, Option<usize>) {
+        let Some(clip) = &self.clip else { return (Vec::new(), None) };
+        // Called every frame by the top bar: only rescan when something changed.
+        if let Some((id, generation, list, at)) = self.versions_memo.borrow().as_ref() {
+            if *id == clip.info.id && *generation == self.bin_generation {
+                return (list.clone(), *at);
+            }
+        }
+        let (list, at) = self.compute_versions();
+        *self.versions_memo.borrow_mut() = Some((clip.info.id, self.bin_generation, list.clone(), at));
+        (list, at)
+    }
+
+    fn compute_versions(&self) -> (Vec<(u32, BinEntry)>, Option<usize>) {
+        let Some(clip) = &self.clip else { return (Vec::new(), None) };
+        let Some(name) = self.clip_version_name() else { return (Vec::new(), None) };
+        let dir = clip.info.path.parent().map(Path::to_path_buf);
+        let scanned;
+        let entries: &[BinEntry] = match &self.bin {
+            Some(b) if b.dir.is_some() && b.dir == dir => &b.entries,
+            _ => {
+                scanned = dir.as_deref().and_then(|d| scan::scan_dir(d).ok()).unwrap_or_default();
+                &scanned
+            }
+        };
+        let list: Vec<(u32, BinEntry)> = scan::versions_in(entries, &name).into_iter().map(|(v, e)| (v, e.clone())).collect();
+        let current = scan::version_of(&name).map(|(_, v)| v);
+        let at = current.and_then(|v| list.iter().position(|(n, _)| *n == v));
+        (list, at)
+    }
+
+    /// Opens another version of the open clip, keeping frame, range, zoom,
+    /// pan, layer and playback.
+    pub fn open_version(&mut self, entry: &BinEntry, cx: &mut Context<Self>) {
+        let keep = self.clip.as_ref().map(|c| {
+            (c.frame_label(self.frame), c.in_point.map(|f| c.frame_label(f)), c.out_point.map(|f| c.frame_label(f)))
+        });
+        let (zoom, pan) = (self.zoom, self.pan);
+        let playing = (self.playback.dir, self.playback.speed);
+        self.open_entry(entry, cx);
+        if let (Some(c), Some((label, in_l, out_l))) = (self.clip.as_mut(), keep) {
+            let first = c.info.first_frame;
+            let last = c.info.frame_count.saturating_sub(1) as i64;
+            let to_index = |l: i64| (l - first).clamp(0, last) as u64;
+            c.in_point = in_l.map(to_index);
+            c.out_point = out_l.map(to_index);
+            let f = to_index(label);
+            self.reconfigure_loaders();
+            self.seek(f);
+        }
+        self.zoom = zoom;
+        self.pan = pan;
+        if playing.0 != 0 {
+            self.play(playing.0, playing.1);
+        }
+        cx.notify();
+    }
+
+    /// Steps to the next older (-1) or newer (+1) version.
+    pub fn step_version(&mut self, delta: i32, cx: &mut Context<Self>) {
+        let (list, at) = self.versions();
+        let Some(at) = at else {
+            self.show_toast("This clip has no other versions here".into());
+            return;
+        };
+        let next = at as i32 + delta;
+        if next < 0 || next as usize >= list.len() {
+            self.show_toast(if delta > 0 { "Already the latest version".into() } else { "Already the first version".into() });
+            return;
+        }
+        let entry = list[next as usize].1.clone();
+        self.open_version(&entry, cx);
+    }
+
+    /// A/B against the version before the open one.
+    pub fn compare_previous(&mut self, cx: &mut Context<Self>) {
+        let (list, at) = self.versions();
+        match at.filter(|a| *a > 0) {
+            Some(a) => match media::open_entry(&list[a - 1].1) {
+                Ok(s) => {
+                    self.compare_mode = CompareMode::Wipe;
+                    self.set_compare(Some(s), cx);
+                }
+                Err(e) => self.show_toast(format!("{e:#}")),
+            },
+            None => self.show_toast("No earlier version to compare with".into()),
+        }
+    }
+
+    /// Notes newer versions of what's open as they land on disk.
+    fn note_versions(&mut self, announce: bool) {
+        let Some(name) = self.clip_version_name() else { return };
+        let Some((key, current)) = scan::version_of(&name) else { return };
+        let (list, _) = self.versions();
+        let Some(&(latest, _)) = list.last() else { return };
+        let seen = self.version_seen.insert(key, latest);
+        if announce && seen.is_some_and(|s| latest > s) && latest > current {
+            self.show_toast(format!("v{latest:03} is in · Alt ↓ to step to it"));
+        }
+    }
+
     /// Shows a bin and watches its folder so it tracks the disk live.
     pub fn set_bin(&mut self, bin: Bin, cx: &mut Context<Self>) {
         self.bin_watcher = None;
+        self.bin_generation += 1;
         if let Some(dir) = bin.dir.clone() {
             self.bin_watcher = watch_dir(&dir, cx);
         }
@@ -563,6 +688,8 @@ impl Plate {
         if let Some(bin) = self.bin.as_mut() {
             bin.entries = entries;
         }
+        self.bin_generation += 1;
+        self.note_versions(true);
         cx.notify();
     }
 
@@ -697,6 +824,7 @@ impl Plate {
         if let Some(l) = carry_layer {
             self.switch_layer(&l);
         }
+        self.note_versions(false);
         self.reconfigure_loaders();
         cx.notify();
     }

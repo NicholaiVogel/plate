@@ -253,6 +253,14 @@ impl Render for Plate {
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &ShowHelp, window, cx| this.open_modal(Modal::Help, window, cx)))
+            .on_action(cx.listener(|this, _: &OlderVersion, _, cx| this.step_version(-1, cx)))
+            .on_action(cx.listener(|this, _: &NewerVersion, _, cx| this.step_version(1, cx)))
+            .on_action(cx.listener(|this, _: &VersionsModal, window, cx| {
+                if this.clip.is_some() {
+                    this.open_modal(Modal::Versions, window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ComparePrevious, _, cx| this.compare_previous(cx)))
             .on_action(cx.listener(|this, _: &PrevLayer, _, cx| {
                 this.step_layer(-1);
                 cx.notify();
