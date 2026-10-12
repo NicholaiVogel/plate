@@ -545,7 +545,7 @@ impl Plate {
         }
         island = island
             .child(div().w(s(1.)).h(s(20.)).mx(s(4.)).bg(theme::hairline()))
-            .child(icon_button("undo-shape", "undo", false).tip("Undo  (Ctrl Z)").on_click(cx.listener(|this, _, _, cx| {
+            .child(icon_button("undo-shape", "undo", false).tip(crate::actions::shortcut_label("Undo  (Ctrl Z)")).on_click(cx.listener(|this, _, _, cx| {
                 this.undo_shape();
                 cx.notify();
             })))

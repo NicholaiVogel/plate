@@ -136,6 +136,7 @@ impl Default for Prefs {
 
 /// A quarter of physical memory, capped at 48 GB.
 fn default_cache_gb() -> f32 {
+    #[cfg(not(target_os = "macos"))]
     let total_kb = std::fs::read_to_string("/proc/meminfo")
         .ok()
         .and_then(|s| {
@@ -145,6 +146,26 @@ fn default_cache_gb() -> f32 {
                 .and_then(|v| v.parse::<f64>().ok())
         })
         .unwrap_or(16.0 * 1024.0 * 1024.0);
+    #[cfg(target_os = "macos")]
+    let total_kb = {
+        let mut bytes = 0u64;
+        let mut len = std::mem::size_of::<u64>();
+        // SAFETY: hw.memsize writes one u64 into the provided, sized buffer.
+        let result = unsafe {
+            libc::sysctlbyname(
+                c"hw.memsize".as_ptr(),
+                (&mut bytes as *mut u64).cast(),
+                &mut len,
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        if result == 0 && len == std::mem::size_of::<u64>() && bytes > 0 {
+            bytes as f64 / 1024.0
+        } else {
+            16.0 * 1024.0 * 1024.0
+        }
+    };
     ((total_kb / 1024.0 / 1024.0) * 0.25).clamp(2.0, 48.0) as f32
 }
 
@@ -218,4 +239,16 @@ pub(crate) fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Res
     let tmp = path.with_extension(format!("tmp{}", std::process::id()));
     std::fs::write(&tmp, bytes)?;
     std::fs::rename(&tmp, path)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    #[test]
+    fn cache_default_uses_physical_memory() {
+        let output = std::process::Command::new("/usr/sbin/sysctl").args(["-n", "hw.memsize"]).output().unwrap();
+        assert!(output.status.success());
+        let bytes: f64 = String::from_utf8(output.stdout).unwrap().trim().parse().unwrap();
+        let expected = ((bytes / (1024.0 * 1024.0 * 1024.0)) * 0.25).clamp(2.0, 48.0) as f32;
+        assert_eq!(super::default_cache_gb(), expected);
+    }
 }

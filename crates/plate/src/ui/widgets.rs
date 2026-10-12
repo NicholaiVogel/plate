@@ -147,3 +147,11 @@ impl TipExt for Stateful<Div> {
         self.tooltip(move |_, cx| cx.new(|_| Tip(text.clone())).into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn primary_button_can_be_constructed() {
+        let _ = super::primary_button("primary-test", "Open files");
+    }
+}

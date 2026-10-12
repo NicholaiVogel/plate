@@ -2,6 +2,7 @@
 # its own compiler and headers, which breaks linking against the system
 # OpenColorIO, OpenImageIO and FFmpeg.
 [env]
+PKG_CONFIG_PATH = { value = "target/macos-deps/lib/pkgconfig", relative = true }
 CC = { value = "/usr/bin/cc", force = true }
 CXX = { value = "/usr/bin/c++", force = true }
 CFLAGS = { value = "", force = true }

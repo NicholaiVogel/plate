@@ -1,7 +1,7 @@
 use super::widgets::{icon_button, icon_button_colored, icon_sized, TipExt};
 use crate::app::{CounterMode, Drag, Plate};
 use crate::theme::{self, s};
-use gpui::{canvas, div, fill, point, prelude::*, px, Bounds, Context, MouseButton, MouseDownEvent, Pixels, Window};
+use gpui::{canvas, div, fill, point, prelude::*, px, Bounds, Context, DispatchPhase, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Window};
 
 /// Shared with the comment composer so their top edges line up.
 pub(super) const TRANSPORT_HEIGHT: f32 = 84.0;
@@ -36,6 +36,7 @@ impl Plate {
 
     fn render_timeline(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let bounds_cell = self.timeline_bounds.clone();
+        let scrub_view = cx.entity().downgrade();
         let data = self.clip.as_ref().map(|clip| {
             let count = clip.info.frame_count.max(1);
             let cached = self.cache.cached(clip.info.id, count);
@@ -56,6 +57,35 @@ impl Plate {
             move |bounds, _, window, _| {
                 // The hit area is taller than the track; the track itself is thin.
                 bounds_cell.set(bounds);
+                // A native drag continues outside the window. Capture these
+                // events without a hover check so edge seeks and releases
+                // cannot get lost when the pointer leaves the timeline.
+                let move_view = scrub_view.clone();
+                window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                    if phase != DispatchPhase::Capture { return; }
+                    let _ = move_view.update(cx, |app, cx| {
+                        if !matches!(app.drag, Drag::Scrub) { return; }
+                        if event.pressed_button != Some(MouseButton::Left) {
+                            app.drag = Drag::None;
+                            return;
+                        }
+                        if let Some(frame) = app.frame_at(event.position.x) {
+                            if frame != app.frame {
+                                app.seek(frame);
+                                cx.notify();
+                            }
+                        }
+                    });
+                });
+                window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
+                    if phase != DispatchPhase::Capture || event.button != MouseButton::Left { return; }
+                    let _ = scrub_view.update(cx, |app, cx| {
+                        if matches!(app.drag, Drag::Scrub) {
+                            app.drag = Drag::None;
+                            cx.notify();
+                        }
+                    });
+                });
                 let Some((count, cached, range, marks, draft)) = data else {
                     let track = Bounds { origin: point(bounds.origin.x, bounds.center().y - s(1.)), size: gpui::size(bounds.size.width, s(2.)) };
                     window.paint_quad(fill(track, theme::hairline()));

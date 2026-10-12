@@ -32,7 +32,13 @@ fi
 
 # --- DCP: two 2-second reels, JPEG 2000 X'Y'Z' picture + 6ch 24-bit PCM ---
 dcp=dcp
-uuid() { cat /proc/sys/kernel/random/uuid; }
+uuid() {
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    cat /proc/sys/kernel/random/uuid
+  else
+    uuidgen | tr '[:upper:]' '[:lower:]'
+  fi
+}
 reels=()
 for n in 1 2; do
   pid=$(uuid); sid=$(uuid)

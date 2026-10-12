@@ -108,18 +108,36 @@ impl Plate {
             .justify_between()
             .gap(s(16.))
             .px(s(12.))
+            .when(cfg!(target_os = "macos"), |d| d.pl(gpui::px(84.)))
             .border_b_1()
             .border_color(theme::hairline())
             .child(
                 div()
                     .flex()
                     .flex_1()
+                    .h_full()
                     .items_center()
                     .gap(s(12.))
                     .min_w_0()
                     .overflow_hidden()
+                    // On macOS the header doubles as the title bar: drag the
+                    // empty area to move the window, double-click to zoom.
+                    // Buttons inside stop the press from reaching it.
+                    .when(cfg!(target_os = "macos"), |d| {
+                        d.on_mouse_down(gpui::MouseButton::Left, |event, window, _| {
+                            #[cfg(target_os = "macos")]
+                            if event.click_count == 2 {
+                                window.titlebar_double_click();
+                            } else {
+                                crate::macos::start_header_drag(window);
+                            }
+                            #[cfg(not(target_os = "macos"))]
+                            let _ = (event, window);
+                        })
+                    })
                     .child(
                         icon_button("bin-toggle", "sidebar", self.prefs.show_bin && self.bin.is_some())
+                            .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
                             .tip("Sidebar  (Shift Tab)")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.prefs.show_bin = !this.prefs.show_bin;
@@ -144,6 +162,7 @@ impl Plate {
                     .children(version_pill.map(|(label, count)| {
                         div()
                             .id("version-pill")
+                            .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
                             .flex_none()
                             .h(s(24.))
                             .pl(s(8.))

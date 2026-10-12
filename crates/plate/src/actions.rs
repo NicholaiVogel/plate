@@ -4,6 +4,15 @@
 
 use gpui::{actions, App, KeyBinding};
 
+/// Match shortcut labels to GPUI's platform-aware `secondary` modifier.
+pub fn shortcut_label(label: &str) -> String {
+    if cfg!(target_os = "macos") {
+        label.replace("Ctrl", "Cmd")
+    } else {
+        label.to_owned()
+    }
+}
+
 actions!(
     plate,
     [
@@ -113,7 +122,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new(",", ExposureDown, v),
         KeyBinding::new("backspace", ResetViewer, v),
         KeyBinding::new("d", ToggleDraw, v),
-        KeyBinding::new("ctrl-z", UndoShape, v),
+        KeyBinding::new("secondary-z", UndoShape, v),
         KeyBinding::new("escape", Escape, v),
         KeyBinding::new("m", ToggleMute, v),
         KeyBinding::new("shift-l", ToggleLoop, v),
@@ -145,19 +154,19 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("6", ToolText, d),
         KeyBinding::new("0", ToolEraser, d),
         KeyBinding::new("x", NextColor, d),
-        KeyBinding::new("ctrl-o", OpenFile, g),
-        KeyBinding::new("ctrl-shift-o", OpenFolder, g),
-        KeyBinding::new("ctrl-s", SaveFrame, g),
-        KeyBinding::new("ctrl-q", Quit, g),
-        KeyBinding::new("ctrl-b", ToggleBin, g),
+        KeyBinding::new("secondary-o", OpenFile, g),
+        KeyBinding::new("secondary-shift-o", OpenFolder, g),
+        KeyBinding::new("secondary-s", SaveFrame, g),
+        KeyBinding::new("secondary-q", Quit, g),
+        KeyBinding::new("secondary-b", ToggleBin, g),
         KeyBinding::new("f11", ToggleFullscreen, g),
-        KeyBinding::new("ctrl-i", ColorspaceModal, g),
-        KeyBinding::new("ctrl-d", DisplayModal, g),
-        KeyBinding::new("ctrl-=", UiScaleUp, g),
-        KeyBinding::new("ctrl-+", UiScaleUp, g),
-        KeyBinding::new("ctrl-shift-=", UiScaleUp, g),
-        KeyBinding::new("ctrl--", UiScaleDown, g),
-        KeyBinding::new("ctrl-0", UiScaleReset, g),
+        KeyBinding::new("secondary-i", ColorspaceModal, g),
+        KeyBinding::new("secondary-d", DisplayModal, g),
+        KeyBinding::new("secondary-=", UiScaleUp, g),
+        KeyBinding::new("secondary-+", UiScaleUp, g),
+        KeyBinding::new("secondary-shift-=", UiScaleUp, g),
+        KeyBinding::new("secondary--", UiScaleDown, g),
+        KeyBinding::new("secondary-0", UiScaleReset, g),
     ]);
 }
 

@@ -97,7 +97,7 @@ impl Plate {
                         this.expanded_stacks.clear();
                         cx.notify();
                     })))
-                    .child(icon_button("bin-open", "folder", false).tip("Open folder  (Ctrl Shift O)").on_click(cx.listener(|this, _, _, cx| this.prompt_open(true, cx))))
+                    .child(icon_button("bin-open", "folder", false).tip(crate::actions::shortcut_label("Open folder  (Ctrl Shift O)")).on_click(cx.listener(|this, _, _, cx| this.prompt_open(true, cx))))
                     .child(icon_button("bin-hide", "sidebar", true).tip("Hide  (Shift Tab)").on_click(cx.listener(|this, _, _, cx| {
                         this.prefs.show_bin = false;
                         cx.notify();

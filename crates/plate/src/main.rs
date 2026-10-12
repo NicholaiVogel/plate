@@ -8,13 +8,16 @@ mod assets;
 mod cli;
 mod demo;
 mod ipc;
+#[cfg(target_os = "macos")]
+mod macos;
 mod text_input;
 mod theme;
 mod ui;
 
 use app::Plate;
+use futures::StreamExt;
 use gpui::{
-    px, size, AppContext, Application, Bounds, TitlebarOptions, WindowBackgroundAppearance, WindowBounds, WindowOptions,
+    point, px, size, AppContext, Application, Bounds, TitlebarOptions, WindowBackgroundAppearance, WindowBounds, WindowOptions,
 };
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -163,7 +166,17 @@ fn main() {
 fn run_gui(req: ipc::OpenRequest) {
     let requests = ipc::listen();
     let owns_socket = requests.is_some();
-    Application::new().with_assets(assets::Assets).run(move |cx| {
+    let application = Application::new().with_assets(assets::Assets);
+    let (open_tx, mut open_rx) = futures::channel::mpsc::unbounded::<Vec<String>>();
+    // Finder events can arrive before the first window is ready.
+    application.on_open_urls(move |urls| { let _ = open_tx.unbounded_send(urls); });
+    application.on_reopen(|cx| {
+        cx.activate(true);
+        for window in cx.windows() {
+            let _ = window.update(cx, |_, window, _| window.activate_window());
+        }
+    });
+    application.run(move |cx| {
         let fonts = assets::FONTS.iter().map(|f| Cow::Borrowed(*f)).collect();
         if let Err(e) = cx.text_system().add_fonts(fonts) {
             log::warn!("loading fonts: {e}");
@@ -176,13 +189,42 @@ fn run_gui(req: ipc::OpenRequest) {
         };
         theme::SF_AVAILABLE.store(has_sf, std::sync::atomic::Ordering::Relaxed);
         theme::apply_font_pref(&plate_core::prefs::Prefs::load().ui_font);
+        #[cfg(target_os = "macos")]
+        {
+            use gpui::{Menu, MenuItem, SystemMenuType};
+            cx.on_action(|_: &actions::Quit, cx| cx.quit());
+            cx.set_menus(vec![
+                Menu { name: "Plate".into(), items: vec![
+                    MenuItem::os_submenu("Services", SystemMenuType::Services),
+                    MenuItem::separator(),
+                    MenuItem::action("Quit Plate", actions::Quit),
+                ]},
+                Menu { name: "File".into(), items: vec![
+                    MenuItem::action("Open…", actions::OpenFile),
+                    MenuItem::action("Open Folder…", actions::OpenFolder),
+                    MenuItem::action("Save Frame…", actions::SaveFrame),
+                ]},
+                Menu { name: "Edit".into(), items: vec![
+                    MenuItem::action("Undo Mark", actions::UndoShape),
+                    MenuItem::separator(),
+                    MenuItem::action("Cut", text_input::Cut),
+                    MenuItem::action("Copy", text_input::Copy),
+                    MenuItem::action("Paste", text_input::Paste),
+                    MenuItem::action("Select All", text_input::SelectAll),
+                ]},
+            ]);
+        }
 
         let bounds = Bounds::centered(None, size(px(1600.), px(960.)), cx);
         let window = cx
             .open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: Some(TitlebarOptions { title: Some("plate".into()), ..Default::default() }),
+                    titlebar: Some(TitlebarOptions {
+                        title: Some("plate".into()),
+                        appears_transparent: cfg!(target_os = "macos"),
+                        traffic_light_position: cfg!(target_os = "macos").then(|| point(px(12.), px(17.))),
+                    }),
                     // PLATE_APP_ID lets test harnesses target the window with
                     // compositor rules without touching normal sessions.
                     app_id: Some(std::env::var("PLATE_APP_ID").unwrap_or_else(|_| "plate".into())),
@@ -219,7 +261,16 @@ fn run_gui(req: ipc::OpenRequest) {
                 },
             )
             .expect("open window");
-        let _ = window;
+        cx.spawn(async move |cx| {
+            while let Some(urls) = open_rx.next().await {
+                let paths = urls.iter().filter_map(|url| parse_arg(url)).collect();
+                let _ = window.update(cx, |app, window, cx| {
+                    app.open_paths(paths, cx);
+                    window.activate_window();
+                    cx.notify();
+                });
+            }
+        }).detach();
         cx.on_window_closed(|cx| {
             if cx.windows().is_empty() {
                 cx.quit();

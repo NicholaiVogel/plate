@@ -1,6 +1,6 @@
 # plate
 
-A color-managed media player for VFX review on Linux. Plays movies, image
+A color-managed media player for VFX review on Linux and macOS. Plays movies, image
 sequences and DCPs through OpenColorIO, with frame-accurate scrubbing,
 channel isolation, A/B compare, pixel probe, and Frame.io-style comments
 with drawn annotations.
@@ -108,6 +108,7 @@ extends in place without losing the frame, cache or notes.
 - `Ctrl S` saves the displayed frame at full resolution with the view
   transform, channel and annotations burned in (PNG, JPEG or TIFF).
 
+On macOS, use `Cmd` in place of `Ctrl` for file, clipboard and undo shortcuts.
 `Ctrl +` / `Ctrl −` / `Ctrl 0` scale the whole UI (remembered across restarts).
 Press `?` in the app for every shortcut.
 
@@ -133,6 +134,49 @@ color choice the GUI remembers.
 
 ## Build
 
+### macOS
+
+Install a Rust toolchain and Apple's Command Line Tools (`xcode-select --install`).
+GPUI compiles its Metal shaders at startup, so the full Xcode app is not required.
+
+If your Homebrew installation provides these packages:
+
+```sh
+brew install pkg-config ffmpeg opencolorio openimageio
+```
+
+Alternatively, install compatible native libraries into `target/macos-deps/`.
+This works on Intel and Apple Silicon and avoids changing system packages:
+
+```sh
+scripts/setup-macos.sh
+export PATH="$PWD/target/macos-deps/bin:$PATH"
+cargo build -p plate
+target/debug/plate path/to/shot_v001.1001.exr
+cargo test --workspace
+```
+
+The setup script downloads micromamba and uses conda-forge for OpenColorIO 2.5,
+OpenImageIO 3.1 and FFmpeg 8. Cargo discovers this local prefix automatically;
+an existing `PKG_CONFIG_PATH` takes precedence. Build against libraries for the
+same architecture as your Rust toolchain.
+
+Create a Finder-launchable app with its native libraries bundled:
+
+```sh
+scripts/build-macos.sh             # target/Plate.app, release build
+scripts/build-macos.sh --debug     # faster development build
+open target/Plate.app
+```
+
+The app is ad-hoc signed for local use. Distribution to other Macs requires
+Developer ID signing and notarization. Finder's Open With, document-opening
+events, native file dialogs, and Command-key shortcuts are supported.
+The native traffic lights sit inside Plate's header; drag the file-title area
+to move the window, or double-click it for the system titlebar action.
+
+### Linux
+
 Arch packages: `ffmpeg opencolorio openimageio openexr` (plus a Rust toolchain).
 
 ```sh
@@ -151,6 +195,11 @@ current `libc`.
 scripts/install.sh                 # ~/.local/bin/plate, desktop entry, icon
 scripts/install.sh --set-default   # also the default for video, EXR, DPX, MXF
 ```
+
+On macOS, the same installer creates `~/Applications/Plate.app` and a
+`~/.local/bin/plate` launcher. Use `scripts/install.sh --debug` to install a
+development build. To change a default handler, use Finder's Get Info →
+Open with → Plate → Change All; `--set-default` prints these steps on macOS.
 
 Folders keep their default handler (drop a folder on the window or use `Ctrl Shift O` to open it as a bin).
 
@@ -174,6 +223,11 @@ Development hooks: `PLATE_DEMO=<steps>` puts the app into a given UI state
 after launch (see `crates/plate/src/demo.rs`), `PLATE_STATS=1` logs the
 presented frame rate during playback, and `PLATE_APP_ID` overrides the Wayland
 app id.
+
+On macOS, `PLATE_CHECK_SCRUB=1 target/debug/plate path/to/movie.mov` runs a
+native interaction check and quits. It verifies header control positions,
+timeline dragging, seeks beyond both window edges, and mouse release outside
+the window. The input must contain more than one frame.
 
 ## License
 
