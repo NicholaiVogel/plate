@@ -99,3 +99,10 @@ Development hooks: `PLATE_DEMO=<steps>` puts the app into a given UI state
 after launch (see `crates/plate/src/demo.rs`), `PLATE_STATS=1` logs the
 presented frame rate during playback, and `PLATE_APP_ID` overrides the Wayland
 app id.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Bundled fonts (Inter Tight, DM Mono) are under the
+SIL Open Font License; their license texts sit next to them in
+`crates/plate/assets/fonts/`. `crates/plate/src/text_input.rs` is adapted from
+gpui's Apache-2.0 input example.
