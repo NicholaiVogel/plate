@@ -42,21 +42,34 @@ pub fn mono(text: impl Into<SharedString>) -> Div {
     div().font_family(FONT_MONO).text_size(s(12.)).child(text.into())
 }
 
-/// A top-bar control: small tag over a value, opening a modal on click.
+/// The joined strip that holds the top-bar controls.
+pub fn segmented() -> Div {
+    div()
+        .h(s(30.))
+        .flex()
+        .flex_none()
+        .items_center()
+        .border_1()
+        .border_color(theme::hairline())
+        .rounded(s(theme::RADIUS))
+        .overflow_hidden()
+}
+
+/// One segment of the strip: a small tag and a value, opening a modal on click.
 pub fn chip(id: impl Into<ElementId>, label: &str, value: impl Into<SharedString>, active: bool) -> Stateful<Div> {
     div()
         .id(id)
-        .h(s(30.))
+        .h_full()
         .px(s(10.))
         .flex()
         .flex_none()
         .items_center()
         .gap(s(8.))
-        .border_1()
-        .border_color(if active { theme::blue() } else { theme::hairline() })
-        .rounded(s(theme::RADIUS))
+        .border_l_1()
+        .border_color(theme::hairline())
+        .when(active, |d| d.bg(theme::blue_soft()))
         .cursor_pointer()
-        .hover(|s| s.border_color(theme::hairline_strong()).bg(theme::hover()))
+        .hover(|s| s.bg(theme::hover()))
         .child(tag(label.to_uppercase()))
         .child(div().text_size(s(12.)).text_color(theme::ink()).max_w(s(220.)).overflow_hidden().whitespace_nowrap().text_ellipsis().child(value.into()))
         .child(icon_sized("chevron-down", 12.).text_color(theme::ink_faint()))
@@ -73,8 +86,6 @@ pub fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
         .gap(s(8.))
         .rounded(s(theme::RADIUS))
         .cursor_pointer()
-        .border_l_2()
-        .border_color(if selected { theme::blue() } else { gpui::transparent_black().into() })
         .when(selected, |d| d.bg(theme::structure()))
         .hover(|s| s.bg(theme::hover()))
 }

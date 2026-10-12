@@ -93,6 +93,10 @@ impl ImageSource {
         Ok(Self { info, frames: Frames::Sequence(seq) })
     }
 
+    pub(crate) fn set_id(&mut self, id: u64) {
+        self.info.id = id;
+    }
+
     pub fn sequence_info(&self) -> Option<&Sequence> {
         match &self.frames {
             Frames::Sequence(s) => Some(s),

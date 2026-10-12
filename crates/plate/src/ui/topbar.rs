@@ -1,4 +1,4 @@
-use super::widgets::{chip, icon_button, tag};
+use super::widgets::{chip, icon_button, segmented, tag};
 use crate::app::{CompareMode, Modal, Plate};
 use crate::theme::{self, s, FONT_MONO};
 use gpui::{div, prelude::*, Context, FontWeight, Window};
@@ -33,9 +33,10 @@ impl Plate {
                 (Some(_), CompareMode::Wipe) => "Wipe".to_string(),
                 (Some(_), CompareMode::SideBySide) => "Side by side".to_string(),
             };
-            controls = controls
+            let strip = segmented()
                 .child(
                     chip("chip-input", "Input", c.choice.colorspace.clone(), self.modal == Some(Modal::Colorspace))
+                        .border_l_0()
                         .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Colorspace, window, cx))),
                 )
                 .child(
@@ -53,7 +54,9 @@ impl Plate {
                 .child(
                     chip("chip-compare", "A/B", compare, self.compare.is_some() || self.modal == Some(Modal::Compare))
                         .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Compare, window, cx))),
-                )
+                );
+            controls = controls
+                .child(strip)
                 .child(div().w(s(1.)).h(s(20.)).mx(s(4.)).bg(theme::hairline()))
                 .child(icon_button("save-frame", "save", false).on_click(cx.listener(|this, _, _, cx| this.save_frame(cx))));
         }

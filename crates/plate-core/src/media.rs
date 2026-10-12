@@ -154,6 +154,15 @@ pub fn open_sequence(seq: Sequence) -> Result<Source> {
     Ok(Arc::new(images::ImageSource::sequence(seq)?))
 }
 
+/// Reopens a sequence under an existing cache id. Only valid when frame
+/// indices still mean the same frames (the first frame hasn't changed), so
+/// a growing render keeps everything already decoded.
+pub fn reopen_sequence(seq: Sequence, id: u64) -> Result<Source> {
+    let mut src = images::ImageSource::sequence(seq)?;
+    src.set_id(id);
+    Ok(Arc::new(src))
+}
+
 /// Opens a bin entry.
 pub fn open_entry(entry: &scan::BinEntry) -> Result<Source> {
     match &entry.kind {

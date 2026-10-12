@@ -181,6 +181,8 @@ impl BinEntry {
 /// Lists a directory for the bin: groups numbered images into sequences, keeps
 /// movies and stills, recognises DCP folders, and lists subdirectories.
 pub fn scan_dir(dir: &Path) -> std::io::Result<Vec<BinEntry>> {
+    // Absolute paths, so entries compare equal to opened media.
+    let dir = &dir.canonicalize()?;
     let mut dirs = Vec::new();
     let mut media = Vec::new();
     let mut groups: BTreeMap<(String, String, usize), Vec<(i64, PathBuf)>> = BTreeMap::new();

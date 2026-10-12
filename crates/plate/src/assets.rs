@@ -48,6 +48,7 @@ fn icon_body(name: &str) -> Option<String> {
         "crosshair" => format!(r#"<circle cx="12" cy="12" r="8"/>{}"#, p(&["M12 2v5", "M12 17v5", "M2 12h5", "M17 12h5"])),
         "message" => p(&["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"]),
         "compare" => format!(r#"<rect x="3" y="3" width="18" height="18" rx="2"/>{}"#, p(&["M12 3v18"])),
+        "expand" => p(&["M15 3h6v6", "M9 21H3v-6", "M21 3l-7 7", "M3 21l7-7"]),
         "maximize" => p(&["M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3"]),
         "x" => p(&["M18 6 6 18", "m6 6 12 12"]),
         "check" => p(&["M20 6 9 17l-5-5"]),

@@ -74,7 +74,10 @@ pub fn scrim() -> Rgba {
     rgba(0x000000b3)
 }
 
-pub const RADIUS: f32 = 2.0;
+/// Barely-there rounding: controls, rows and cards.
+pub const RADIUS: f32 = 4.0;
+/// Modals and floating islands.
+pub const RADIUS_LG: f32 = 6.0;
 
 /// Annotation colors, chosen to read on top of footage.
 pub const MARKERS: [[u8; 3]; 7] = [

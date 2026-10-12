@@ -1,4 +1,4 @@
-use super::widgets::{icon, icon_button, row, tag, TipExt};
+use super::widgets::{icon_button, icon_sized, row, tag, TipExt};
 use crate::app::{dir_title, Bin, Plate};
 use crate::theme::{self, s};
 use gpui::{div, prelude::*, Context, FontWeight, Window};
@@ -10,7 +10,7 @@ impl Plate {
         let current = self.clip.as_ref().map(|c| c.info.path.clone());
         let parent = bin.dir.as_ref().and_then(|d| d.parent().map(|p| p.to_path_buf()));
 
-        let mut list = div().id("bin-list").flex_1().min_h_0().overflow_y_scroll().p(s(6.)).flex().flex_col().gap(s(1.));
+        let mut list = div().id("bin-list").flex_1().min_h_0().overflow_y_scroll().p(s(6.)).flex().flex_col();
         for (i, e) in bin.entries.iter().enumerate() {
             let selected = current.as_ref().is_some_and(|c| match &e.kind {
                 EntryKind::Sequence(seq) => {
@@ -19,19 +19,20 @@ impl Plate {
                 }
                 _ => *c == e.path,
             });
-            let (glyph, sub) = match &e.kind {
-                EntryKind::Directory => ("folder", None),
-                EntryKind::Dcp => ("projector", Some("DCP".to_string())),
-                EntryKind::Video => ("film", Some(scan::ext_of(&e.path).to_uppercase())),
-                EntryKind::Still => ("image", Some(scan::ext_of(&e.path).to_uppercase())),
+            // The name already carries the extension; only sequences and
+            // DCPs get a quiet right-hand note.
+            let (glyph, sub, warn) = match &e.kind {
+                EntryKind::Directory => ("folder", None, false),
+                EntryKind::Dcp => ("projector", Some("DCP".to_string()), false),
+                EntryKind::Video => ("film", None, false),
+                EntryKind::Still => ("image", None, false),
                 EntryKind::Sequence(seq) => {
                     let missing = seq.missing();
-                    let s = if missing > 0 {
-                        format!("{}–{}  ·  {} MISSING", seq.first, seq.last, missing)
+                    if missing > 0 {
+                        ("layers", Some(format!("{} MISSING", missing)), true)
                     } else {
-                        format!("{}–{}  ·  {} FR", seq.first, seq.last, seq.len())
-                    };
-                    ("layers", Some(s))
+                        ("layers", Some(format!("{}–{}", seq.first, seq.last)), false)
+                    }
                 }
             };
             let name = match &e.kind {
@@ -41,15 +42,20 @@ impl Plate {
             let entry = e.clone();
             list = list.child(
                 row(("bin", i), selected)
-                    .child(icon(glyph).text_color(if selected { theme::blue() } else { theme::ink_faint() }))
+                    .py(s(5.))
+                    .child(icon_sized(glyph, 14.).text_color(if selected { theme::blue() } else { theme::ink_faint() }))
                     .child(
                         div()
-                            .flex()
-                            .flex_col()
+                            .flex_1()
                             .min_w_0()
-                            .child(div().text_size(s(12.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(name))
-                            .children(sub.map(|s| tag(s).whitespace_nowrap().overflow_hidden().text_ellipsis())),
+                            .text_size(s(12.))
+                            .text_color(if selected { theme::ink() } else { theme::ink_muted() })
+                            .whitespace_nowrap()
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .child(name),
                     )
+                    .children(sub.map(|t| tag(t).flex_none().when(warn, |d| d.text_color(theme::warn()))))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_entry(&entry, cx);
                         this.focus_viewer(window);
@@ -89,7 +95,7 @@ impl Plate {
                     .when_some(parent, |d, parent| {
                         d.child(icon_button("bin-up", "up", false).tip("Parent folder").on_click(cx.listener(move |this, _, _, cx| {
                             if let Ok(entries) = scan::scan_dir(&parent) {
-                                this.bin = Some(Bin { dir: Some(parent.clone()), title: dir_title(&parent), entries });
+                                this.set_bin(Bin { dir: Some(parent.clone()), title: dir_title(&parent), entries }, cx);
                                 cx.notify();
                             }
                         })))

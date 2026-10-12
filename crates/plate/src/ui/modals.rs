@@ -34,13 +34,15 @@ impl Plate {
                 div()
                     .id("modal")
                     .w(s(width))
-                    .max_h(s(f32::from(window.viewport_size().height) * 0.8))
+                    // Already in window pixels; not UI-scaled.
+                    .max_h(window.viewport_size().height * 0.8)
                     .flex()
                     .flex_col()
                     .bg(theme::paper())
                     .border_1()
                     .border_color(theme::hairline_strong())
-                    .rounded(s(theme::RADIUS))
+                    .rounded(s(theme::RADIUS_LG))
+                    .overflow_hidden()
                     .shadow_lg()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(

@@ -103,6 +103,12 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 app.submit_comment(arg.to_string());
             }
             "scale" => app.set_ui_scale(arg.parse().unwrap_or(1.4), cx),
+            "bounds" => log::info!(
+                "viewer {:?} timeline {:?} window {:?}",
+                app.viewer_bounds.get(),
+                app.timeline_bounds.get(),
+                window.bounds().size
+            ),
             "toast" => app.show_toast("Saved /tmp/frame_1012.png".into()),
             _ => log::warn!("unknown demo step {name}"),
         }

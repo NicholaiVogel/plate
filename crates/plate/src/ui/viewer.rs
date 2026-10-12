@@ -275,22 +275,20 @@ impl Plate {
             }
         }
 
-        // Clip label, bottom-left, like the reference.
-        let status = match self.present_status() {
-            Some(s) => s,
-            None => String::new(),
-        };
-        layer = layer.child(
-            div()
-                .absolute()
-                .left(s(14.))
-                .bottom(s(12.))
-                .flex()
-                .items_center()
-                .gap(s(10.))
-                .child(div().text_size(s(15.)).text_color(theme::ink()).child(clip.info.name.clone()))
-                .when(!status.is_empty(), |d| d.child(tag(status))),
-        );
+        // The name lives in the top bar; the viewer only reports status.
+        if let Some(status) = self.present_status() {
+            layer = layer.child(
+                div()
+                    .absolute()
+                    .right(s(14.))
+                    .bottom(s(12.))
+                    .px(s(8.))
+                    .py(s(3.))
+                    .rounded(s(theme::RADIUS))
+                    .bg(theme::scrim())
+                    .child(tag(status)),
+            );
+        }
 
         if let Some(b) = &self.compare {
             let label = |text: String, right: bool| {
@@ -301,6 +299,7 @@ impl Plate {
                     .when(!right, |d| d.left(s(14.)))
                     .px(s(8.))
                     .py(s(3.))
+                    .rounded(s(theme::RADIUS))
                     .bg(theme::scrim())
                     .border_1()
                     .border_color(theme::hairline())
@@ -331,6 +330,7 @@ impl Plate {
                             .py(s(14.))
                             .border_1()
                             .border_color(theme::warn())
+                            .rounded(s(theme::RADIUS_LG))
                             .bg(theme::scrim())
                             .child(mono(format!("MISSING FRAME {}", self.frame_text(self.frame))).text_color(theme::warn()))
                             .child(div().text_size(s(12.)).text_color(theme::ink_muted()).max_w(s(420.)).child(err)),
@@ -361,6 +361,7 @@ impl Plate {
                     .px(s(10.))
                     .py(s(8.))
                     .bg(theme::scrim())
+                    .rounded(s(theme::RADIUS))
                     .border_1()
                     .border_color(theme::hairline_strong())
                     .children(swatch.map(|c| div().size(s(28.)).bg(c).border_1().border_color(theme::hairline_strong())))
@@ -411,7 +412,8 @@ impl Plate {
             .bg(theme::raised())
             .border_1()
             .border_color(theme::hairline_strong())
-            .rounded(s(theme::RADIUS));
+            .rounded(s(theme::RADIUS_LG))
+            .shadow_md();
         for tool in Tool::ALL {
             island = island.child(
                 div()

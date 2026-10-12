@@ -1,12 +1,22 @@
 use super::widgets::{icon_button, icon_button_colored, icon_sized, TipExt};
 use crate::app::{CounterMode, Drag, Plate};
 use crate::theme::{self, s, FONT_MONO};
-use gpui::{canvas, div, fill, point, prelude::*, Bounds, Context, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Window};
+use gpui::{canvas, div, fill, point, prelude::*, px, Bounds, Context, MouseButton, MouseDownEvent, Pixels, Window};
+
+/// Shared with the comment composer so their top edges line up.
+pub(super) const TRANSPORT_HEIGHT: f32 = 84.0;
 
 impl Plate {
     pub(super) fn render_transport(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Clamped to the column: if the controls could push it wider, the
+        // timeline would run under the comments panel and the playhead would
+        // no longer sit under the cursor.
         div()
             .flex_none()
+            .w_full()
+            .min_w_0()
+            .h(s(TRANSPORT_HEIGHT))
+            .overflow_hidden()
             .flex()
             .flex_col()
             .border_t_1()
@@ -15,7 +25,7 @@ impl Plate {
             .child(self.render_controls(window, cx))
     }
 
-    fn frame_at(&self, x: Pixels) -> Option<u64> {
+    pub(super) fn frame_at(&self, x: Pixels) -> Option<u64> {
         let clip = self.clip.as_ref()?;
         let b = self.timeline_bounds.get();
         let w = f32::from(b.size.width).max(1.0);
@@ -52,11 +62,11 @@ impl Plate {
                     return;
                 };
                 let w = f32::from(bounds.size.width);
-                let x_of = |f: u64| bounds.origin.x + s(w * f as f32 / count as f32);
+                let x_of = |f: u64| bounds.origin.x + px(w * f as f32 / count as f32);
                 let frame_w = (w / count as f32).max(1.0);
                 let track_y = bounds.origin.y + s(14.);
                 let track = Bounds { origin: point(bounds.origin.x, track_y), size: gpui::size(bounds.size.width, s(4.)) };
-                window.paint_quad(fill(track, theme::hairline()));
+                window.paint_quad(fill(track, theme::hairline()).corner_radii(s(2.)));
 
                 // Cached frames, merged into runs.
                 let mut i = 0usize;
@@ -68,42 +78,42 @@ impl Plate {
                         }
                         let r = Bounds {
                             origin: point(x_of(start as u64), track_y),
-                            size: gpui::size(s((w * (i - start) as f32 / count as f32).max(1.0)), s(4.)),
+                            size: gpui::size(px((w * (i - start) as f32 / count as f32).max(1.0)), s(4.)),
                         };
-                        window.paint_quad(fill(r, theme::blue_soft()));
+                        window.paint_quad(fill(r, theme::blue_soft()).corner_radii(s(2.)));
                     } else {
                         i += 1;
                     }
                 }
                 // Played portion.
                 let played = Bounds { origin: point(bounds.origin.x, track_y + s(1.)), size: gpui::size(x_of(frame) - bounds.origin.x, s(2.)) };
-                window.paint_quad(fill(played, theme::blue()));
+                window.paint_quad(fill(played, theme::blue()).corner_radii(s(1.)));
 
                 if let Some((a, b)) = range {
                     let r = Bounds::from_corners(point(x_of(a), track_y - s(5.)), point(x_of(b + 1), track_y - s(3.)));
-                    window.paint_quad(fill(r, theme::blue()));
+                    window.paint_quad(fill(r, theme::blue()).corner_radii(s(1.)));
                     for (x, left) in [(x_of(a), true), (x_of(b + 1), false)] {
                         let tick = Bounds { origin: point(if left { x } else { x - s(2.) }, track_y - s(7.)), size: gpui::size(s(2.), s(13.)) };
                         window.paint_quad(fill(tick, theme::blue()));
                     }
                 }
                 for (f, done) in marks {
-                    let cx = x_of(f) + s(frame_w / 2.);
+                    let cx = x_of(f) + px(frame_w / 2.);
                     let size = if Some(f) == focused_frame { 9. } else { 7. };
                     let m = Bounds::centered_at(point(cx, track_y + s(13.)), gpui::size(s(size), s(size)));
                     let color = if done { theme::ink_faint() } else { theme::warn() };
                     window.paint_quad(fill(m, color).corner_radii(s(size / 2.)));
                 }
                 if let Some(f) = draft {
-                    let m = Bounds::centered_at(point(x_of(f) + s(frame_w / 2.), track_y + s(13.)), gpui::size(s(7.), s(7.)));
+                    let m = Bounds::centered_at(point(x_of(f) + px(frame_w / 2.), track_y + s(13.)), gpui::size(s(7.), s(7.)));
                     window.paint_quad(fill(m, theme::ink()).corner_radii(s(3.5)));
                 }
                 // Playhead: the frame's slot, faint, with a crisp line and knob.
                 if frame_w >= 4.0 {
-                    let slot = Bounds { origin: point(x_of(frame), track_y - s(4.)), size: gpui::size(s(frame_w), s(12.)) };
+                    let slot = Bounds { origin: point(x_of(frame), track_y - s(4.)), size: gpui::size(px(frame_w), s(12.)) };
                     window.paint_quad(fill(slot, theme::hover()));
                 }
-                let x = x_of(frame) + s((frame_w / 2.0).min(frame_w - 1.0).max(0.0));
+                let x = x_of(frame) + px((frame_w / 2.0).min(frame_w - 1.0).max(0.0));
                 let line = Bounds { origin: point(x - s(1.), bounds.origin.y + s(6.)), size: gpui::size(s(2.), s(20.)) };
                 window.paint_quad(fill(line, theme::ink()));
                 let knob = Bounds::centered_at(point(x, bounds.origin.y + s(6.)), gpui::size(s(10.), s(6.)));
@@ -125,16 +135,6 @@ impl Plate {
                     this.drag = Drag::Scrub;
                     this.seek(f);
                     cx.notify();
-                }
-            }))
-            .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, _, cx| {
-                if matches!(this.drag, Drag::Scrub) {
-                    if let Some(f) = this.frame_at(ev.position.x) {
-                        if f != this.frame {
-                            this.seek(f);
-                            cx.notify();
-                        }
-                    }
                 }
             }))
             .child(painter)
@@ -168,15 +168,20 @@ impl Plate {
         div()
             .h(s(46.))
             .px(s(10.))
+            .w_full()
+            .min_w_0()
             .flex()
             .items_center()
             .justify_between()
+            .gap(s(12.))
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap(s(2.))
                     .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
                     .child(icon_button("step-back", "step-back", false).tip("Previous frame  (←)").on_click(cx.listener(|this, _, _, cx| {
                         this.step(-1);
                         cx.notify();
@@ -292,6 +297,8 @@ impl Plate {
                 div()
                     .flex()
                     .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
                     .justify_end()
                     .items_center()
                     .gap(s(2.))
@@ -340,7 +347,7 @@ impl Plate {
                             cx.notify();
                         })),
                     )
-                    .child(icon_button("fullscreen", "aperture", false).tip("Fullscreen  (F11)").on_click(|_, window, _| window.toggle_fullscreen())),
+                    .child(icon_button("fullscreen", "expand", false).tip("Fullscreen  (F11)").on_click(|_, window, _| window.toggle_fullscreen())),
             )
     }
 }

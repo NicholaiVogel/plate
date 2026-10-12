@@ -298,6 +298,7 @@ pub struct Plate {
     /// Viewer and timeline geometry from the last paint, for mouse mapping.
     pub viewer_bounds: Rc<Cell<Bounds<Pixels>>>,
     stats: Option<(Instant, u32, u64)>,
+    bin_watcher: Option<notify::RecommendedWatcher>,
     pub window_title: String,
     pub timeline_bounds: Rc<Cell<Bounds<Pixels>>>,
     frame_ready_tx: futures::channel::mpsc::UnboundedSender<()>,
@@ -376,6 +377,7 @@ impl Plate {
             presenter: Presenter::default(),
             viewer_bounds: Rc::new(Cell::new(Bounds::default())),
             window_title: String::new(),
+            bin_watcher: None,
             stats: std::env::var("PLATE_STATS").is_ok().then(|| (Instant::now(), 0, u64::MAX)),
             timeline_bounds: Rc::new(Cell::new(Bounds::default())),
             frame_ready_tx: tx,
@@ -389,6 +391,8 @@ impl Plate {
     // ---------------------------------------------------------------- opening
 
     pub fn open_path(&mut self, path: &Path, cx: &mut Context<Self>) {
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let path = canonical.as_path();
         if path.is_dir() && !scan::is_dcp_dir(path) {
             self.open_folder(path, cx);
             return;
@@ -398,7 +402,7 @@ impl Plate {
         if let Some(parent) = path.parent() {
             if self.bin.as_ref().and_then(|b| b.dir.as_deref()) != Some(parent) && !scan::is_dcp_dir(path) {
                 if let Ok(entries) = scan::scan_dir(parent) {
-                    self.bin = Some(Bin { dir: Some(parent.to_path_buf()), title: dir_title(parent), entries });
+                    self.set_bin(Bin { dir: Some(parent.to_path_buf()), title: dir_title(parent), entries }, cx);
                 }
             }
         }
@@ -420,10 +424,12 @@ impl Plate {
     }
 
     pub fn open_folder(&mut self, dir: &Path, cx: &mut Context<Self>) {
+        let canonical = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+        let dir = canonical.as_path();
         match scan::scan_dir(dir) {
             Ok(entries) => {
                 let first = entries.iter().find(|e| e.is_playable()).cloned();
-                self.bin = Some(Bin { dir: Some(dir.to_path_buf()), title: dir_title(dir), entries });
+                self.set_bin(Bin { dir: Some(dir.to_path_buf()), title: dir_title(dir), entries }, cx);
                 self.prefs.show_bin = true;
                 if let Some(e) = first {
                     self.open_entry(&e, cx);
@@ -462,13 +468,88 @@ impl Plate {
                     })
                     .collect();
                 let first = entries.iter().find(|e| e.is_playable()).cloned();
-                self.bin = Some(Bin { dir: None, title: format!("{} items", entries.len()), entries });
+                self.set_bin(Bin { dir: None, title: format!("{} items", entries.len()), entries }, cx);
                 self.prefs.show_bin = true;
                 if let Some(e) = first {
                     self.open_entry(&e, cx);
                 }
             }
         }
+    }
+
+    /// Shows a bin and watches its folder so it tracks the disk live.
+    pub fn set_bin(&mut self, bin: Bin, cx: &mut Context<Self>) {
+        self.bin_watcher = None;
+        if let Some(dir) = bin.dir.clone() {
+            self.bin_watcher = watch_dir(&dir, cx);
+        }
+        self.bin = Some(bin);
+    }
+
+    /// Rescans the bin folder after a change on disk. A sequence that is
+    /// open and has grown (a render in progress) is reopened at the same
+    /// frame, and frames that were missing are retried.
+    pub fn refresh_bin(&mut self, cx: &mut Context<Self>) {
+        let Some(dir) = self.bin.as_ref().and_then(|b| b.dir.clone()) else { return };
+        log::debug!("rescanning {}", dir.display());
+        let entries = match scan::scan_dir(&dir) {
+            Ok(e) => e,
+            // The folder itself went away; keep what we have.
+            Err(_) => return,
+        };
+        if let Some(clip) = &self.clip {
+            clip.loader.retry_failed();
+            let current = clip.info.path.clone();
+            let grown = entries.iter().find_map(|e| match &e.kind {
+                EntryKind::Sequence(seq) if entry_matches(e, &current) => {
+                    let changed = clip.info.first_frame != seq.first || clip.info.frame_count != seq.len();
+                    changed.then(|| seq.clone())
+                }
+                _ => None,
+            });
+            if let Some(seq) = grown {
+                self.swap_sequence(seq);
+            }
+        }
+        if let Some(bin) = self.bin.as_mut() {
+            bin.entries = entries;
+        }
+        cx.notify();
+    }
+
+    /// Replaces the open sequence with a re-scanned one in place: same frame,
+    /// range, color, notes and playback. When only the end moved the cache
+    /// is kept, since every index still means the same frame.
+    fn swap_sequence(&mut self, seq: scan::Sequence) {
+        let Some(old) = self.clip.take() else { return };
+        let same_start = old.info.first_frame == seq.first;
+        let opened = if same_start { media::reopen_sequence(seq.clone(), old.info.id) } else { media::open_sequence(seq.clone()) };
+        let source = match opened {
+            Ok(s) => s,
+            Err(e) => {
+                self.clip = Some(old);
+                log::warn!("rescanned sequence won't open: {e:#}");
+                return;
+            }
+        };
+        let to_index = |label: i64| (label - seq.first).clamp(0, seq.len() as i64 - 1) as u64;
+        let frame = to_index(old.frame_label(self.frame));
+        let in_point = old.in_point.map(|f| to_index(old.frame_label(f)));
+        let out_point = old.out_point.map(|f| to_index(old.frame_label(f)));
+        let tx = self.frame_ready_tx.clone();
+        let loader = Loader::new(source.clone(), self.cache.clone(), move |_| {
+            let _ = tx.unbounded_send(());
+        });
+        if !same_start {
+            self.cache.remove_source(old.info.id);
+            self.presenter.clear();
+        }
+        let info = source.info().clone();
+        let Clip { notes, choice, remembered, .. } = old;
+        self.clip = Some(Clip { source, info, loader, notes, choice, remembered, in_point, out_point });
+        self.frame = frame;
+        self.reconfigure_loaders();
+        self.sync_loaders();
     }
 
     fn make_clip(&mut self, source: Source) -> Clip {
@@ -1442,6 +1523,38 @@ pub fn image_rect(
     let size = gpui::size(px(width as f32 * aspect.max(0.01) * scale), px(height as f32 * scale));
     let center = area.center() + pan;
     Bounds { origin: point(center.x - size.width / 2., center.y - size.height / 2.), size }
+}
+
+/// Watches one folder (not recursively) and asks the app to rescan, at most
+/// a few times a second however busy the folder is.
+fn watch_dir(dir: &Path, cx: &mut Context<Plate>) -> Option<notify::RecommendedWatcher> {
+    use notify::Watcher;
+    let (tx, mut rx) = futures::channel::mpsc::unbounded::<()>();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(ev) = res {
+            if !matches!(ev.kind, notify::EventKind::Access(_)) {
+                let _ = tx.unbounded_send(());
+            }
+        }
+    })
+    .map_err(|e| log::warn!("can't watch {}: {e}", dir.display()))
+    .ok()?;
+    if let Err(e) = watcher.watch(dir, notify::RecursiveMode::NonRecursive) {
+        log::warn!("can't watch {}: {e}", dir.display());
+        return None;
+    }
+    cx.spawn(async move |this, cx| {
+        while rx.next().await.is_some() {
+            // Let a burst (a render writing frames, a copy) settle first.
+            cx.background_executor().timer(Duration::from_millis(300)).await;
+            while let Ok(()) = rx.try_recv() {}
+            if this.update(cx, |app, cx| app.refresh_bin(cx)).is_err() {
+                break;
+            }
+        }
+    })
+    .detach();
+    Some(watcher)
 }
 
 pub fn dir_title(dir: &Path) -> String {
