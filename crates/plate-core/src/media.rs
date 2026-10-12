@@ -31,6 +31,11 @@ impl FormatKey {
         format!("{}/{}", self.container, self.codec)
     }
 
+    /// Just the codec or sample type, e.g. `ProRes`, `half float`.
+    pub fn codec_label(&self) -> String {
+        pretty_codec(&self.codec)
+    }
+
     /// Human label, e.g. `MOV · ProRes`.
     pub fn label(&self) -> String {
         format!("{} · {}", self.container.to_uppercase(), pretty_codec(&self.codec))
@@ -41,15 +46,27 @@ fn pretty_codec(codec: &str) -> String {
     match codec {
         "prores" => "ProRes".into(),
         "h264" => "H.264".into(),
-        "hevc" => "HEVC".into(),
+        "hevc" => "H.265".into(),
         "av1" => "AV1".into(),
+        "vp8" => "VP8".into(),
         "vp9" => "VP9".into(),
+        "mpeg4" => "MPEG-4".into(),
+        "mpeg2video" => "MPEG-2".into(),
+        "mpeg1video" => "MPEG-1".into(),
         "dnxhd" => "DNxHD/HR".into(),
+        "cfhd" => "CineForm".into(),
         "jpeg2000" => "JPEG 2000".into(),
         "mjpeg" => "Motion JPEG".into(),
-        "half" => "half float".into(),
-        "float" => "float".into(),
-        other => other.to_string(),
+        "rawvideo" => "uncompressed".into(),
+        "qtrle" => "QuickTime RLE".into(),
+        "png" => "PNG".into(),
+        "ffv1" => "FFV1".into(),
+        "half" => "16-bit half".into(),
+        "float" => "32-bit float".into(),
+        other => match other.strip_suffix("bit") {
+            Some(bits) => format!("{bits}-bit"),
+            None => other.to_string(),
+        },
     }
 }
 

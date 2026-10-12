@@ -1,4 +1,4 @@
-use super::widgets::{chip, icon_button, icon_sized, segmented, tag, TipExt};
+use super::widgets::{chip, icon_button, icon_sized, segmented, TipExt};
 use crate::app::{CompareMode, Modal, Plate, SliderKind};
 use crate::theme::{self, s, FONT_MONO};
 use gpui::{div, prelude::*, Context, FontWeight, Window};
@@ -7,18 +7,32 @@ use plate_core::display::Channel;
 impl Plate {
     pub(super) fn render_topbar(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let clip = self.clip.as_ref();
-        let meta = clip.map(|c| {
-            let i = &c.info;
-            let fps = if (i.fps - i.fps.round()).abs() < 0.01 { format!("{:.0}", i.fps) } else { format!("{:.3}", i.fps) };
-            let mut parts = vec![format!("{}×{}", i.width, i.height), format!("{fps} fps"), i.format.label()];
-            if i.frame_count > 1 {
-                parts.push(format!("{} fr", i.frame_count));
-            }
-            if i.has_alpha {
-                parts.push("alpha".into());
-            }
-            parts.join("  ·  ")
-        });
+        // A short spec beside the name: what you'd want to check at a glance.
+        // The container is in the extension and the length is in the counter.
+        let spec: Vec<String> = clip
+            .map(|c| {
+                let i = &c.info;
+                let fps = if (i.fps - i.fps.round()).abs() < 0.01 { format!("{:.0} fps", i.fps) } else { format!("{:.3} fps", i.fps) };
+                let mut parts = vec![format!("{} × {}", i.width, i.height), fps, i.format.codec_label()];
+                if i.has_alpha {
+                    parts.push("alpha".into());
+                }
+                if !i.layers.is_empty() {
+                    parts.push(format!("{} layers", i.layers.len()));
+                }
+                parts
+            })
+            .unwrap_or_default();
+        // Name with the extension dimmed; sequences show their pattern.
+        let (stem, ext) = clip
+            .map(|c| {
+                let name = c.info.name.split(" [").next().unwrap_or(&c.info.name).to_string();
+                match name.rfind('.') {
+                    Some(dot) if dot > 0 && name.len() - dot <= 6 => (name[..dot].to_string(), name[dot..].to_string()),
+                    _ => (name, String::new()),
+                }
+            })
+            .unwrap_or_default();
 
         let version_pill = {
             let (list, at) = self.versions();
@@ -105,59 +119,60 @@ impl Plate {
                     .min_w_0()
                     .overflow_hidden()
                     .child(
-                        div()
-                            .id("bin-toggle")
-                            .flex()
-                            .items_center()
-                            .gap(s(8.))
-                            .cursor_pointer()
+                        icon_button("bin-toggle", "sidebar", self.prefs.show_bin && self.bin.is_some())
+                            .tip("Sidebar  (Shift Tab)")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.prefs.show_bin = !this.prefs.show_bin;
+                                this.prefs.save();
                                 cx.notify();
-                            }))
-                            .flex_none()
-                            .child(div().size(s(8.)).bg(theme::blue()))
-                            .child(div().font_family(FONT_MONO).font_weight(FontWeight::MEDIUM).text_size(s(12.)).child("PLATE")),
+                            })),
                     )
-                    .child(div().flex_none().w(s(1.)).h(s(20.)).bg(theme::hairline()))
                     .child(match clip {
-                        Some(c) => div()
+                        Some(_) => div()
                             .flex()
-                            .flex_col()
+                            .items_baseline()
                             .min_w_0()
                             .flex_shrink()
-                            .child(
-                                div()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_size(s(13.))
-                                    .whitespace_nowrap()
-                                    .overflow_hidden()
-                                    .text_ellipsis()
-                                    .child(c.info.name.clone()),
-                            )
-                            .child(tag(meta.unwrap_or_default()).whitespace_nowrap().overflow_hidden().text_ellipsis()),
-                        None => div().text_color(theme::ink_faint()).text_size(s(13.)).child("No media"),
+                            .whitespace_nowrap()
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .text_size(s(14.))
+                            .child(div().font_weight(FontWeight::MEDIUM).text_color(theme::ink()).child(stem))
+                            .child(div().text_color(theme::ink_faint()).child(ext)),
+                        None => div().text_color(theme::ink_faint()).text_size(s(14.)).child("No media"),
                     })
                     .children(version_pill.map(|(label, count)| {
                         div()
                             .id("version-pill")
                             .flex_none()
-                            .h(s(22.))
-                            .px(s(8.))
+                            .h(s(24.))
+                            .pl(s(8.))
+                            .pr(s(6.))
                             .flex()
                             .items_center()
-                            .gap(s(6.))
+                            .gap(s(4.))
                             .rounded(s(theme::RADIUS))
-                            .border_1()
-                            .border_color(theme::hairline())
+                            .bg(theme::raised())
                             .cursor_pointer()
-                            .hover(|st| st.bg(theme::hover()))
-                            .child(div().font_family(FONT_MONO).text_size(s(12.)).child(label))
-                            .child(tag(format!("OF {count}")))
-                            .child(icon_sized("chevron-down", 12.).text_color(theme::ink_faint()))
-                            .tip("Versions  (V · Alt ↑ ↓ to step · Shift V to compare)")
+                            .hover(|st| st.bg(theme::structure()))
+                            .child(div().text_size(s(13.)).text_color(theme::ink()).child(label))
+                            .child(icon_sized("chevron-down", 12.).text_color(theme::ink_muted()))
+                            .tip(format!("{count} versions · V lists them · Alt ↑ ↓ steps · Shift V compares"))
                             .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Versions, window, cx)))
-                    })),
+                    }))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(s(14.))
+                            .ml(s(6.))
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_size(s(12.))
+                            .text_color(theme::ink_muted())
+                            .children(spec.into_iter().map(|p| div().flex_none().child(p))),
+                    ),
             )
             .child(controls)
     }
