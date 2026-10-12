@@ -124,6 +124,14 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 window.bounds().size
             ),
             "quit" => cx.quit(),
+            "root" => {
+                let p = std::path::Path::new(arg).canonicalize().unwrap_or_else(|_| arg.into());
+                app.set_root(&p, cx);
+            }
+            "expand" => {
+                let p = std::path::Path::new(arg).canonicalize().unwrap_or_else(|_| arg.into());
+                app.toggle_folder(&p);
+            }
             "older" => app.step_version(-1, cx),
             "newer" => app.step_version(1, cx),
             "compare_prev" => app.compare_previous(cx),

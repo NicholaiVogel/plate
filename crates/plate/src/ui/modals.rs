@@ -291,8 +291,9 @@ impl Plate {
         }
 
         let mut list = div().id("compare-list").max_h(s(320.)).overflow_y_scroll().p(s(6.)).flex().flex_col();
-        if let Some(bin) = &self.bin {
-            for (i, e) in bin.entries.iter().enumerate() {
+        {
+            let rows = self.visible_rows();
+            for (i, e) in rows.iter().map(|r| &r.entry).enumerate() {
                 if matches!(e.kind, EntryKind::Directory) || current_a.as_ref() == Some(&e.path) {
                     continue;
                 }

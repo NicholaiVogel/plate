@@ -255,10 +255,54 @@ pub struct Probe {
     pub shown: Option<[f32; 3]>,
 }
 
+/// The media tree in the sidebar: a root folder, with folders expanded in
+/// place and scanned on demand, like a code editor's explorer.
 pub struct Bin {
+    /// The root folder; None for an ad-hoc list of files.
     pub dir: Option<PathBuf>,
     pub title: String,
+    /// The root's children.
     pub entries: Vec<BinEntry>,
+    /// Children of expanded folders.
+    pub children: HashMap<PathBuf, Vec<BinEntry>>,
+    pub expanded: HashSet<PathBuf>,
+}
+
+impl Bin {
+    pub fn folder(dir: &Path, entries: Vec<BinEntry>) -> Self {
+        Self { dir: Some(dir.to_path_buf()), title: dir_title(dir), entries, children: HashMap::new(), expanded: HashSet::new() }
+    }
+
+    /// Entries of the root or of a loaded subfolder.
+    pub fn entries_in(&self, dir: &Path) -> Option<&Vec<BinEntry>> {
+        if self.dir.as_deref() == Some(dir) {
+            Some(&self.entries)
+        } else {
+            self.children.get(dir)
+        }
+    }
+
+    pub fn contains(&self, path: &Path) -> bool {
+        self.dir.as_deref().is_some_and(|root| path.starts_with(root))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum RowKind {
+    Folder { expanded: bool },
+    Item,
+    /// The newest of a version stack.
+    StackHead { key: String, count: usize, expanded: bool },
+    /// An older version under an expanded stack.
+    StackMember,
+}
+
+/// One visible line of the tree, in display order.
+#[derive(Clone, Debug)]
+pub struct Row {
+    pub depth: usize,
+    pub entry: BinEntry,
+    pub kind: RowKind,
 }
 
 pub struct Toast {
@@ -324,6 +368,9 @@ pub struct Plate {
     /// Viewer and timeline geometry from the last paint, for mouse mapping.
     pub viewer_bounds: Rc<Cell<Bounds<Pixels>>>,
     stats: Option<(Instant, u32, u64)>,
+    pub bin_scroll: gpui::ScrollHandle,
+    /// Scroll the tree to the open clip on the next render.
+    pub reveal_pending: bool,
     bin_watcher: Option<notify::RecommendedWatcher>,
     pub window_title: String,
     pub timeline_bounds: Rc<Cell<Bounds<Pixels>>>,
@@ -420,6 +467,8 @@ impl Plate {
             presenter: Presenter::default(),
             viewer_bounds: Rc::new(Cell::new(Bounds::default())),
             window_title: String::new(),
+            bin_scroll: gpui::ScrollHandle::new(),
+            reveal_pending: false,
             bin_watcher: None,
             stats: std::env::var("PLATE_STATS").is_ok().then(|| (Instant::now(), 0, u64::MAX)),
             timeline_bounds: Rc::new(Cell::new(Bounds::default())),
@@ -458,12 +507,14 @@ impl Plate {
             self.open_folder(path, cx);
             return;
         }
-        // Opening a file also lists its folder in the bin, so neighbours are a
-        // keypress away.
+        // Opening a file shows it in the tree: revealed if it's under the
+        // current root, otherwise its folder becomes the root.
         if let Some(parent) = path.parent() {
-            if self.bin.as_ref().and_then(|b| b.dir.as_deref()) != Some(parent) && !scan::is_dcp_dir(path) {
-                if let Ok(entries) = scan::scan_dir(parent) {
-                    self.set_bin(Bin { dir: Some(parent.to_path_buf()), title: dir_title(parent), entries }, cx);
+            if !scan::is_dcp_dir(path) {
+                if self.bin.as_ref().is_some_and(|b| b.contains(path)) {
+                    self.reveal(path);
+                } else if let Ok(entries) = scan::scan_dir(parent) {
+                    self.set_bin(Bin::folder(parent, entries), cx);
                 }
             }
         }
@@ -475,7 +526,12 @@ impl Plate {
 
     pub fn open_entry(&mut self, entry: &BinEntry, cx: &mut Context<Self>) {
         if matches!(entry.kind, EntryKind::Directory) {
-            self.open_folder(&entry.path.clone(), cx);
+            if self.bin.as_ref().is_some_and(|b| b.contains(&entry.path)) {
+                self.toggle_folder(&entry.path.clone());
+                cx.notify();
+            } else {
+                self.open_folder(&entry.path.clone(), cx);
+            }
             return;
         }
         match media::open_entry(entry) {
@@ -490,7 +546,7 @@ impl Plate {
         match scan::scan_dir(dir) {
             Ok(entries) => {
                 let first = entries.iter().find(|e| e.is_playable()).cloned();
-                self.set_bin(Bin { dir: Some(dir.to_path_buf()), title: dir_title(dir), entries }, cx);
+                self.set_bin(Bin::folder(dir, entries), cx);
                 self.prefs.show_bin = true;
                 if let Some(e) = first {
                     self.open_entry(&e, cx);
@@ -529,7 +585,10 @@ impl Plate {
                     })
                     .collect();
                 let first = entries.iter().find(|e| e.is_playable()).cloned();
-                self.set_bin(Bin { dir: None, title: format!("{} items", entries.len()), entries }, cx);
+                self.set_bin(
+                    Bin { dir: None, title: format!("{} items", entries.len()), entries, children: HashMap::new(), expanded: HashSet::new() },
+                    cx,
+                );
                 self.prefs.show_bin = true;
                 if let Some(e) = first {
                     self.open_entry(&e, cx);
@@ -567,8 +626,8 @@ impl Plate {
         let Some(name) = self.clip_version_name() else { return (Vec::new(), None) };
         let dir = clip.info.path.parent().map(Path::to_path_buf);
         let scanned;
-        let entries: &[BinEntry] = match &self.bin {
-            Some(b) if b.dir.is_some() && b.dir == dir => &b.entries,
+        let entries: &[BinEntry] = match (&self.bin, dir.as_deref()) {
+            (Some(b), Some(d)) if b.entries_in(d).is_some() => b.entries_in(d).unwrap(),
             _ => {
                 scanned = dir.as_deref().and_then(|d| scan::scan_dir(d).ok()).unwrap_or_default();
                 &scanned
@@ -650,14 +709,152 @@ impl Plate {
         }
     }
 
-    /// Shows a bin and watches its folder so it tracks the disk live.
+    /// Shows a bin and watches its folders so it tracks the disk live.
     pub fn set_bin(&mut self, bin: Bin, cx: &mut Context<Self>) {
         self.bin_watcher = None;
         self.bin_generation += 1;
         if let Some(dir) = bin.dir.clone() {
             self.bin_watcher = watch_dir(&dir, cx);
+            if let Some(w) = self.bin_watcher.as_mut() {
+                for d in &bin.expanded {
+                    watch_more(w, d);
+                }
+            }
         }
         self.bin = Some(bin);
+        self.reveal_pending = true;
+    }
+
+    /// Expands or collapses a folder in the tree, scanning it the first time.
+    pub fn toggle_folder(&mut self, dir: &Path) {
+        let Some(bin) = self.bin.as_mut() else { return };
+        if bin.expanded.remove(dir) {
+            if let Some(w) = self.bin_watcher.as_mut() {
+                use notify::Watcher;
+                let _ = w.unwatch(dir);
+            }
+        } else {
+            self.expand_folder(dir);
+        }
+        self.bin_generation += 1;
+    }
+
+    fn expand_folder(&mut self, dir: &Path) {
+        let Some(bin) = self.bin.as_mut() else { return };
+        if !bin.children.contains_key(dir) || !bin.expanded.contains(dir) {
+            match scan::scan_dir(dir) {
+                Ok(e) => {
+                    bin.children.insert(dir.to_path_buf(), e);
+                }
+                Err(e) => {
+                    log::warn!("{}: {e}", dir.display());
+                    return;
+                }
+            }
+        }
+        if bin.expanded.insert(dir.to_path_buf()) {
+            if let Some(w) = self.bin_watcher.as_mut() {
+                watch_more(w, dir);
+            }
+        }
+    }
+
+    /// Expands the folders between the root and `path`, so it's visible.
+    pub fn reveal(&mut self, path: &Path) {
+        let Some(root) = self.bin.as_ref().and_then(|b| b.dir.clone()) else { return };
+        let Ok(rel) = path.parent().unwrap_or(path).strip_prefix(&root) else { return };
+        let mut dir = root;
+        for part in rel.components() {
+            dir = dir.join(part);
+            self.expand_folder(&dir);
+        }
+        self.bin_generation += 1;
+        self.reveal_pending = true;
+    }
+
+    /// Makes `dir` the root of the tree, keeping folders that stay inside it
+    /// expanded (and the old root expanded, when moving up).
+    pub fn set_root(&mut self, dir: &Path, cx: &mut Context<Self>) {
+        let Ok(entries) = scan::scan_dir(dir) else { return };
+        let mut bin = Bin::folder(dir, entries);
+        if let Some(old) = self.bin.take() {
+            for (p, e) in old.children {
+                if p.starts_with(dir) && p != dir {
+                    bin.children.insert(p, e);
+                }
+            }
+            bin.expanded = old.expanded.into_iter().filter(|p| p.starts_with(dir) && p != dir).collect();
+            if let Some(old_root) = old.dir {
+                if old_root.starts_with(dir) && old_root != dir {
+                    bin.children.insert(old_root.clone(), old.entries);
+                    bin.expanded.insert(old_root);
+                }
+            }
+        }
+        self.set_bin(bin, cx);
+        // Keep the open clip in view: expand the path down to it.
+        if let Some(p) = self.clip.as_ref().map(|c| c.info.path.clone()) {
+            if self.bin.as_ref().is_some_and(|b| b.contains(&p)) {
+                self.reveal(&p);
+            }
+        }
+    }
+
+    /// The tree as displayed: folders, items and version stacks, in order.
+    pub fn visible_rows(&self) -> Vec<Row> {
+        let Some(bin) = &self.bin else { return Vec::new() };
+        let mut rows = Vec::new();
+        self.push_rows(bin, &bin.entries, 0, &mut rows);
+        rows
+    }
+
+    fn push_rows(&self, bin: &Bin, entries: &[BinEntry], depth: usize, rows: &mut Vec<Row>) {
+        // Versions of the same shot stack into one row (newest first).
+        let mut stacks: HashMap<String, Vec<(u32, usize)>> = HashMap::new();
+        for (i, e) in entries.iter().enumerate() {
+            if e.is_playable() {
+                if let Some((key, v)) = scan::version_of(&scan::version_name(e)) {
+                    stacks.entry(key).or_default().push((v, i));
+                }
+            }
+        }
+        stacks.retain(|_, v| v.len() > 1);
+        for v in stacks.values_mut() {
+            v.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
+        }
+        let mut emitted = HashSet::new();
+        for (i, e) in entries.iter().enumerate() {
+            if matches!(e.kind, EntryKind::Directory) {
+                let expanded = bin.expanded.contains(&e.path);
+                rows.push(Row { depth, entry: e.clone(), kind: RowKind::Folder { expanded } });
+                if expanded {
+                    if let Some(children) = bin.children.get(&e.path) {
+                        self.push_rows(bin, children, depth + 1, rows);
+                    }
+                }
+                continue;
+            }
+            let stack = stacks.iter().find(|(_, v)| v.iter().any(|(_, j)| *j == i));
+            match stack {
+                None => rows.push(Row { depth, entry: e.clone(), kind: RowKind::Item }),
+                Some((key, members)) => {
+                    if !emitted.insert(key.clone()) {
+                        continue;
+                    }
+                    let expanded = self.expanded_stacks.contains(key);
+                    rows.push(Row {
+                        depth,
+                        entry: entries[members[0].1].clone(),
+                        kind: RowKind::StackHead { key: key.clone(), count: members.len(), expanded },
+                    });
+                    if expanded {
+                        for (_, j) in members.iter().skip(1) {
+                            rows.push(Row { depth: depth + 1, entry: entries[*j].clone(), kind: RowKind::StackMember });
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Rescans the bin folder after a change on disk. A sequence that is
@@ -671,10 +868,20 @@ impl Plate {
             // The folder itself went away; keep what we have.
             Err(_) => return,
         };
+        // Expanded folders too; ones that vanished collapse.
+        let expanded: Vec<PathBuf> = self.bin.as_ref().map(|b| b.expanded.iter().cloned().collect()).unwrap_or_default();
+        let mut children = HashMap::new();
+        for d in expanded {
+            if let Ok(e) = scan::scan_dir(&d) {
+                children.insert(d, e);
+            }
+        }
         if let Some(clip) = &self.clip {
             clip.loader.retry_failed();
             let current = clip.info.path.clone();
-            let grown = entries.iter().find_map(|e| match &e.kind {
+            let clip_dir = current.parent().map(Path::to_path_buf);
+            let siblings = if clip_dir.as_deref() == Some(dir.as_path()) { Some(&entries) } else { clip_dir.as_ref().and_then(|d| children.get(d)) };
+            let grown = siblings.into_iter().flatten().find_map(|e| match &e.kind {
                 EntryKind::Sequence(seq) if entry_matches(e, &current) => {
                     let changed = clip.info.first_frame != seq.first || clip.info.frame_count != seq.len();
                     changed.then(|| seq.clone())
@@ -687,6 +894,8 @@ impl Plate {
         }
         if let Some(bin) = self.bin.as_mut() {
             bin.entries = entries;
+            bin.expanded.retain(|d| children.contains_key(d));
+            bin.children = children;
         }
         self.bin_generation += 1;
         self.note_versions(true);
@@ -825,6 +1034,7 @@ impl Plate {
             self.switch_layer(&l);
         }
         self.note_versions(false);
+        self.reveal_pending = true;
         self.reconfigure_loaders();
         cx.notify();
     }
@@ -915,9 +1125,10 @@ impl Plate {
         .detach();
     }
 
+    /// Steps through playable rows in tree order (collapsed stacks count once).
     pub fn step_clip(&mut self, delta: i32, cx: &mut Context<Self>) {
-        let Some(bin) = &self.bin else { return };
-        let playable: Vec<&BinEntry> = bin.entries.iter().filter(|e| e.is_playable()).collect();
+        let rows = self.visible_rows();
+        let playable: Vec<&BinEntry> = rows.iter().map(|r| &r.entry).filter(|e| e.is_playable()).collect();
         if playable.is_empty() {
             return;
         }
@@ -1877,6 +2088,13 @@ fn find_captions(info: &MediaInfo) -> Option<plate_core::captions::Captions> {
             log::warn!("{}: {e:#}", path.display());
             None
         }
+    }
+}
+
+fn watch_more(w: &mut notify::RecommendedWatcher, dir: &Path) {
+    use notify::Watcher;
+    if let Err(e) = w.watch(dir, notify::RecursiveMode::NonRecursive) {
+        log::warn!("can't watch {}: {e}", dir.display());
     }
 }
 

@@ -55,10 +55,17 @@ removed on the next start. Nothing persists between sessions.
 
 ## Bin
 
-Opening a file lists its folder; opening a folder lists it directly. The bin
-follows the disk live: new renders, deleted versions and copied-in files show
-up as they happen, and a sequence that grows while it's open (a render in
-progress) extends in place without losing the frame, cache or notes.
+The sidebar is a tree, like a code editor's explorer. Opening a file roots it
+at the file's folder (or reveals the file, if it's already under the root);
+opening a folder roots it there. Folders expand in place and are scanned when
+first opened; double-click a folder to make it the root, or step the root up
+with the arrow. Sequences, DCPs and version stacks appear at every level, and
+↑/↓ steps through clips in tree order.
+
+The tree follows the disk live: the root and every expanded folder are
+watched, so new renders, deleted versions and copied-in files appear as they
+happen, and a sequence that grows while it's open (a render in progress)
+extends in place without losing the frame, cache or notes.
 
 ## Versions and layers
 
