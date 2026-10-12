@@ -1,8 +1,8 @@
 use super::widgets::{button, icon, icon_button, primary_button, row, tag};
 use crate::actions::SHORTCUTS;
 use crate::app::{CompareMode, Modal, Plate};
-use crate::theme::{self, FONT_MONO};
-use gpui::{div, prelude::*, px, AnyElement, Context, Div, FontWeight, MouseButton, PathPromptOptions, SharedString, Window};
+use crate::theme::{self, s, FONT_MONO};
+use gpui::{div, prelude::*, AnyElement, Context, Div, FontWeight, MouseButton, PathPromptOptions, SharedString, Window};
 use plate_core::display::Channel;
 use plate_core::media;
 use plate_core::prefs::{ColorChoice, OcioChoice};
@@ -28,26 +28,26 @@ impl Plate {
             .flex()
             .flex_col()
             .items_center()
-            .pt(px(64.))
+            .pt(s(64.))
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.close_modal(window, cx)))
             .child(
                 div()
                     .id("modal")
-                    .w(px(width))
-                    .max_h(px(f32::from(window.viewport_size().height) * 0.8))
+                    .w(s(width))
+                    .max_h(s(f32::from(window.viewport_size().height) * 0.8))
                     .flex()
                     .flex_col()
                     .bg(theme::paper())
                     .border_1()
                     .border_color(theme::hairline_strong())
-                    .rounded(px(theme::RADIUS))
+                    .rounded(s(theme::RADIUS))
                     .shadow_lg()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
                         div()
-                            .h(px(44.))
+                            .h(s(44.))
                             .flex_none()
-                            .px(px(14.))
+                            .px(s(14.))
                             .flex()
                             .items_center()
                             .justify_between()
@@ -69,7 +69,7 @@ impl Plate {
         let hint = clip.info.colorspace_hint.clone();
         let remembered = clip.remembered;
 
-        let mut list = div().id("cs-list").flex_1().min_h_0().overflow_y_scroll().p(px(6.)).flex().flex_col();
+        let mut list = div().id("cs-list").flex_1().min_h_0().overflow_y_scroll().p(s(6.)).flex().flex_col();
         let mut shown = 0;
         for (family, spaces) in self.color.grouped() {
             let matches: Vec<_> = spaces
@@ -79,7 +79,7 @@ impl Plate {
             if matches.is_empty() {
                 continue;
             }
-            list = list.child(div().px(px(10.)).pt(px(10.)).pb(px(4.)).child(tag(family.to_uppercase())));
+            list = list.child(div().px(s(10.)).pt(s(10.)).pb(s(4.)).child(tag(family.to_uppercase())));
             for cs in matches {
                 shown += 1;
                 let name = cs.name.clone();
@@ -87,7 +87,7 @@ impl Plate {
                 let enc = cs.encoding.clone();
                 list = list.child(
                     row(SharedString::from(format!("cs-{name}")), selected)
-                        .child(div().flex_1().min_w_0().text_size(px(13.)).child(name.clone()))
+                        .child(div().flex_1().min_w_0().text_size(s(13.)).child(name.clone()))
                         .when(!enc.is_empty(), |d| d.child(tag(enc.to_uppercase())))
                         .when(selected, |d| d.child(icon("check").text_color(theme::blue())))
                         .on_click(cx.listener(move |this, _, window, cx| {
@@ -101,7 +101,7 @@ impl Plate {
             }
         }
         if shown == 0 {
-            list = list.child(div().p(px(14.)).text_color(theme::ink_faint()).child("No colorspace matches"));
+            list = list.child(div().p(s(14.)).text_color(theme::ink_faint()).child("No colorspace matches"));
         }
 
         div()
@@ -110,16 +110,16 @@ impl Plate {
             .min_h_0()
             .child(
                 div()
-                    .p(px(10.))
+                    .p(s(10.))
                     .border_b_1()
                     .border_color(theme::hairline())
                     .child(
                         div()
-                            .px(px(10.))
-                            .py(px(7.))
+                            .px(s(10.))
+                            .py(s(7.))
                             .border_1()
                             .border_color(theme::hairline_strong())
-                            .rounded(px(theme::RADIUS))
+                            .rounded(s(theme::RADIUS))
                             .bg(theme::raised())
                             .child(self.search_input.clone()),
                     ),
@@ -128,20 +128,20 @@ impl Plate {
             .child(
                 div()
                     .flex_none()
-                    .px(px(14.))
-                    .py(px(10.))
+                    .px(s(14.))
+                    .py(s(10.))
                     .border_t_1()
                     .border_color(theme::hairline())
                     .flex()
                     .items_center()
                     .justify_between()
-                    .gap(px(12.))
+                    .gap(s(12.))
                     .child(
                         div()
                             .flex()
                             .flex_col()
-                            .gap(px(2.))
-                            .child(div().text_size(px(12.)).child(format!("Remembered for every {format_label} file")))
+                            .gap(s(2.))
+                            .child(div().text_size(s(12.)).child(format!("Remembered for every {format_label} file")))
                             .child(tag(match (remembered, hint) {
                                 (true, _) => "SET BY YOU".to_string(),
                                 (false, Some(h)) => format!("DEFAULT · FILE SAYS {}", h.to_uppercase()),
@@ -159,14 +159,14 @@ impl Plate {
         let Some(clip) = &self.clip else { return div() };
         let choice = clip.choice.clone();
         let views = self.color.views(&choice.display);
-        let mut displays = div().id("displays").flex_1().overflow_y_scroll().p(px(6.)).flex().flex_col().border_r_1().border_color(theme::hairline());
+        let mut displays = div().id("displays").flex_1().overflow_y_scroll().p(s(6.)).flex().flex_col().border_r_1().border_color(theme::hairline());
         for d in self.color.displays.clone() {
             let selected = d == choice.display;
             let c = choice.clone();
             let dd = d.clone();
             displays = displays.child(
                 row(SharedString::from(format!("d-{d}")), selected)
-                    .child(div().text_size(px(13.)).child(d.clone()))
+                    .child(div().text_size(s(13.)).child(d.clone()))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         let views = this.color.views(&dd);
                         let view = if views.contains(&c.view) { c.view.clone() } else { this.color.config.default_view(&dd) };
@@ -175,14 +175,14 @@ impl Plate {
                     })),
             );
         }
-        let mut view_list = div().id("views").flex_1().overflow_y_scroll().p(px(6.)).flex().flex_col();
+        let mut view_list = div().id("views").flex_1().overflow_y_scroll().p(s(6.)).flex().flex_col();
         for v in views {
             let selected = v == choice.view;
             let c = choice.clone();
             let vv = v.clone();
             view_list = view_list.child(
                 row(SharedString::from(format!("v-{v}")), selected)
-                    .child(div().flex_1().text_size(px(13.)).child(v.clone()))
+                    .child(div().flex_1().text_size(s(13.)).child(v.clone()))
                     .when(selected, |d| d.child(icon("check").text_color(theme::blue())))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.set_choice(ColorChoice { view: vv.clone(), ..c.clone() });
@@ -196,24 +196,24 @@ impl Plate {
             .child(
                 div()
                     .flex()
-                    .h(px(360.))
-                    .child(div().flex().flex_col().flex_1().child(div().px(px(16.)).pt(px(10.)).child(tag("DISPLAY"))).child(displays))
-                    .child(div().flex().flex_col().flex_1().child(div().px(px(16.)).pt(px(10.)).child(tag("VIEW"))).child(view_list)),
+                    .h(s(360.))
+                    .child(div().flex().flex_col().flex_1().child(div().px(s(16.)).pt(s(10.)).child(tag("DISPLAY"))).child(displays))
+                    .child(div().flex().flex_col().flex_1().child(div().px(s(16.)).pt(s(10.)).child(tag("VIEW"))).child(view_list)),
             )
             .child(
                 div()
-                    .px(px(14.))
-                    .py(px(10.))
+                    .px(s(14.))
+                    .py(s(10.))
                     .border_t_1()
                     .border_color(theme::hairline())
-                    .text_size(px(12.))
+                    .text_size(s(12.))
                     .text_color(theme::ink_muted())
                     .child(format!("Remembered with the input colorspace for every {} file", clip.info.format.label())),
             )
     }
 
     fn modal_channel(&mut self, cx: &mut Context<Self>) -> Div {
-        let mut list = div().p(px(6.)).flex().flex_col();
+        let mut list = div().p(s(6.)).flex().flex_col();
         for ch in Channel::ALL {
             let selected = ch == self.channel;
             let key = match ch {
@@ -233,9 +233,9 @@ impl Plate {
             };
             list = list.child(
                 row(SharedString::from(format!("ch-{}", ch.short())), selected)
-                    .child(div().size(px(10.)).bg(swatch))
-                    .child(div().flex_1().text_size(px(13.)).child(ch.label()))
-                    .child(div().font_family(FONT_MONO).text_size(px(11.)).text_color(theme::ink_faint()).child(key))
+                    .child(div().size(s(10.)).bg(swatch))
+                    .child(div().flex_1().text_size(s(13.)).child(ch.label()))
+                    .child(div().font_family(FONT_MONO).text_size(s(11.)).text_color(theme::ink_faint()).child(key))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.channel = ch;
                         this.close_modal(window, cx);
@@ -247,7 +247,7 @@ impl Plate {
 
     fn modal_exposure(&mut self, cx: &mut Context<Self>) -> Div {
         let stepper = |id: &'static str, label: &str, value: String, dec: Box<dyn Fn(&mut Plate)>, inc: Box<dyn Fn(&mut Plate)>, presets: Vec<(String, Box<dyn Fn(&mut Plate)>)>, cx: &mut Context<Plate>| {
-            let mut presets_row = div().flex().gap(px(4.));
+            let mut presets_row = div().flex().gap(s(4.));
             for (i, (label, f)) in presets.into_iter().enumerate() {
                 presets_row = presets_row.child(
                     button(SharedString::from(format!("{id}-p{i}")), label).font_family(FONT_MONO).on_click(cx.listener(move |this, _, _, cx| {
@@ -259,19 +259,19 @@ impl Plate {
             div()
                 .flex()
                 .flex_col()
-                .gap(px(8.))
+                .gap(s(8.))
                 .child(tag(label.to_uppercase()))
                 .child(
                     div()
                         .flex()
                         .items_center()
-                        .gap(px(8.))
-                        .child(button(SharedString::from(format!("{id}-dec")), "−").w(px(36.)).on_click(cx.listener(move |this, _, _, cx| {
+                        .gap(s(8.))
+                        .child(button(SharedString::from(format!("{id}-dec")), "−").w(s(36.)).on_click(cx.listener(move |this, _, _, cx| {
                             dec(this);
                             cx.notify();
                         })))
-                        .child(div().w(px(80.)).flex().justify_center().font_family(FONT_MONO).text_size(px(18.)).child(value))
-                        .child(button(SharedString::from(format!("{id}-inc")), "+").w(px(36.)).on_click(cx.listener(move |this, _, _, cx| {
+                        .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(18.)).child(value))
+                        .child(button(SharedString::from(format!("{id}-inc")), "+").w(s(36.)).on_click(cx.listener(move |this, _, _, cx| {
                             inc(this);
                             cx.notify();
                         }))),
@@ -287,10 +287,10 @@ impl Plate {
             .map(|v| (format!("{v:.1}"), Box::new(move |p: &mut Plate| p.gamma = v) as Box<dyn Fn(&mut Plate)>))
             .collect();
         div()
-            .p(px(18.))
+            .p(s(18.))
             .flex()
             .flex_col()
-            .gap(px(22.))
+            .gap(s(22.))
             .child(stepper(
                 "exp",
                 "Exposure (stops, scene-linear)",
@@ -327,11 +327,11 @@ impl Plate {
         let current_a = self.clip.as_ref().map(|c| c.info.path.clone());
         let mut body = div().flex().flex_col();
         let mode_row = div()
-            .px(px(14.))
-            .py(px(12.))
+            .px(s(14.))
+            .py(s(12.))
             .flex()
             .items_center()
-            .gap(px(8.))
+            .gap(s(8.))
             .border_b_1()
             .border_color(theme::hairline())
             .child(tag("MODE"))
@@ -348,14 +348,14 @@ impl Plate {
         if let Some(b) = &self.compare {
             body = body.child(
                 div()
-                    .px(px(14.))
-                    .py(px(12.))
+                    .px(s(14.))
+                    .py(s(12.))
                     .flex()
                     .items_center()
                     .justify_between()
                     .border_b_1()
                     .border_color(theme::hairline())
-                    .child(div().flex().flex_col().child(tag("B")).child(div().text_size(px(13.)).child(b.info.name.clone())))
+                    .child(div().flex().flex_col().child(tag("B")).child(div().text_size(s(13.)).child(b.info.name.clone())))
                     .child(button("compare-off", "Turn off").on_click(cx.listener(|this, _, window, cx| {
                         this.set_compare(None, cx);
                         this.close_modal(window, cx);
@@ -363,7 +363,7 @@ impl Plate {
             );
         }
 
-        let mut list = div().id("compare-list").max_h(px(320.)).overflow_y_scroll().p(px(6.)).flex().flex_col();
+        let mut list = div().id("compare-list").max_h(s(320.)).overflow_y_scroll().p(s(6.)).flex().flex_col();
         if let Some(bin) = &self.bin {
             for (i, e) in bin.entries.iter().enumerate() {
                 if matches!(e.kind, EntryKind::Directory) || current_a.as_ref() == Some(&e.path) {
@@ -375,7 +375,7 @@ impl Plate {
                     _ => e.name.clone(),
                 };
                 let selected = self.compare.as_ref().is_some_and(|c| c.info.path == e.path);
-                list = list.child(row(("cmp", i), selected).child(div().text_size(px(13.)).child(name)).on_click(cx.listener(move |this, _, window, cx| {
+                list = list.child(row(("cmp", i), selected).child(div().text_size(s(13.)).child(name)).on_click(cx.listener(move |this, _, window, cx| {
                     match media::open_entry(&entry) {
                         Ok(s) => this.set_compare(Some(s), cx),
                         Err(e) => this.show_toast(format!("{e:#}")),
@@ -384,12 +384,12 @@ impl Plate {
                 })));
             }
         }
-        body.child(div().px(px(14.)).pt(px(10.)).child(tag("PICK B FROM THE BIN")))
+        body.child(div().px(s(14.)).pt(s(10.)).child(tag("PICK B FROM THE BIN")))
             .child(list)
             .child(
                 div()
-                    .px(px(14.))
-                    .py(px(10.))
+                    .px(s(14.))
+                    .py(s(10.))
                     .border_t_1()
                     .border_color(theme::hairline())
                     .flex()
@@ -414,12 +414,12 @@ impl Plate {
             (OcioChoice::Builtin, "Built-in ACES studio config".into(), "ocio://studio-config-latest".into()),
             (OcioChoice::Env, "$OCIO".into(), env.clone().unwrap_or_else(|| "not set in this session".into())),
         ];
-        let mut configs = div().p(px(6.)).flex().flex_col();
+        let mut configs = div().p(s(6.)).flex().flex_col();
         for (choice, label, detail) in options {
             let selected = current == choice;
             configs = configs.child(
                 row(SharedString::from(format!("ocio-{label}")), selected)
-                    .child(div().flex().flex_col().flex_1().child(div().text_size(px(13.)).child(label)).child(tag(detail)))
+                    .child(div().flex().flex_col().flex_1().child(div().text_size(s(13.)).child(label)).child(tag(detail)))
                     .when(selected, |d| d.child(icon("check").text_color(theme::blue())))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.prefs.ocio = choice.clone();
@@ -439,7 +439,7 @@ impl Plate {
                         .flex()
                         .flex_col()
                         .flex_1()
-                        .child(div().text_size(px(13.)).child("Config file…"))
+                        .child(div().text_size(s(13.)).child("Config file…"))
                         .child(tag(custom.unwrap_or_else(|| "pick any config.ocio".into()))),
                 )
                 .on_click(cx.listener(|_, _, _, cx| {
@@ -462,23 +462,23 @@ impl Plate {
 
         let key = self.color.memory_key();
         let memory: Vec<(String, ColorChoice)> = self.prefs.color_memory.get(&key).map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
-        let mut mem_list = div().p(px(6.)).flex().flex_col();
+        let mut mem_list = div().p(s(6.)).flex().flex_col();
         if memory.is_empty() {
-            mem_list = mem_list.child(div().px(px(10.)).py(px(6.)).text_size(px(12.)).text_color(theme::ink_faint()).child("Nothing yet. Pick an input colorspace and it's remembered for that format."));
+            mem_list = mem_list.child(div().px(s(10.)).py(s(6.)).text_size(s(12.)).text_color(theme::ink_faint()).child("Nothing yet. Pick an input colorspace and it's remembered for that format."));
         }
         for (fmt, choice) in memory {
             let f = fmt.clone();
             let k = key.clone();
             mem_list = mem_list.child(
                 div()
-                    .px(px(10.))
-                    .py(px(5.))
+                    .px(s(10.))
+                    .py(s(5.))
                     .flex()
                     .items_center()
-                    .gap(px(10.))
-                    .child(div().w(px(110.)).font_family(FONT_MONO).text_size(px(11.)).child(fmt.to_uppercase()))
-                    .child(div().flex_1().min_w_0().text_size(px(12.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(format!("{}  →  {}", choice.colorspace, choice.view)))
-                    .child(icon_button(SharedString::from(format!("forget-{fmt}")), "x", false).size(px(24.)).on_click(cx.listener(move |this, _, _, cx| {
+                    .gap(s(10.))
+                    .child(div().w(s(110.)).font_family(FONT_MONO).text_size(s(11.)).child(fmt.to_uppercase()))
+                    .child(div().flex_1().min_w_0().text_size(s(12.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(format!("{}  →  {}", choice.colorspace, choice.view)))
+                    .child(icon_button(SharedString::from(format!("forget-{fmt}")), "x", false).size(s(24.)).on_click(cx.listener(move |this, _, _, cx| {
                         this.prefs.forget(&k, &f);
                         this.prefs.save();
                         this.reload_color(cx);
@@ -500,38 +500,38 @@ impl Plate {
             .child(section("FRAME CACHE", Some(format!("{used:.1} GB in use"))))
             .child(
                 div()
-                    .px(px(16.))
-                    .py(px(10.))
+                    .px(s(16.))
+                    .py(s(10.))
                     .flex()
                     .items_center()
-                    .gap(px(8.))
-                    .child(button("cache-dec", "−").w(px(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb - 2.0, cx))))
-                    .child(div().w(px(80.)).flex().justify_center().font_family(FONT_MONO).text_size(px(16.)).child(format!("{gb:.0} GB")))
-                    .child(button("cache-inc", "+").w(px(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb + 2.0, cx)))),
+                    .gap(s(8.))
+                    .child(button("cache-dec", "−").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb - 2.0, cx))))
+                    .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(16.)).child(format!("{gb:.0} GB")))
+                    .child(button("cache-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb + 2.0, cx)))),
             )
             .child(
                 div()
-                    .px(px(16.))
-                    .py(px(12.))
+                    .px(s(16.))
+                    .py(s(12.))
                     .border_t_1()
                     .border_color(theme::hairline())
-                    .text_size(px(11.))
+                    .text_size(s(11.))
                     .text_color(theme::ink_faint())
                     .child(format!("Preferences: {}", plate_core::prefs::config_dir().join("prefs.json").display())),
             )
     }
 
     fn modal_help(&self) -> Div {
-        let mut grid = div().p(px(16.)).flex().flex_wrap().gap(px(18.));
+        let mut grid = div().p(s(16.)).flex().flex_wrap().gap(s(18.));
         for (group, keys) in SHORTCUTS {
-            let mut col = div().w(px(320.)).flex().flex_col().gap(px(4.)).child(div().pb(px(4.)).child(tag(group.to_uppercase())));
+            let mut col = div().w(s(320.)).flex().flex_col().gap(s(4.)).child(div().pb(s(4.)).child(tag(group.to_uppercase())));
             for (k, what) in keys.iter() {
                 col = col.child(
                     div()
                         .flex()
-                        .gap(px(10.))
-                        .child(div().w(px(110.)).font_family(FONT_MONO).text_size(px(11.)).text_color(theme::blue()).child(*k))
-                        .child(div().flex_1().text_size(px(12.)).text_color(theme::ink_muted()).child(*what)),
+                        .gap(s(10.))
+                        .child(div().w(s(110.)).font_family(FONT_MONO).text_size(s(11.)).text_color(theme::blue()).child(*k))
+                        .child(div().flex_1().text_size(s(12.)).text_color(theme::ink_muted()).child(*what)),
                 );
             }
             grid = grid.child(col);
@@ -541,17 +541,17 @@ impl Plate {
 
     fn modal_text(&self) -> Div {
         div()
-            .p(px(14.))
+            .p(s(14.))
             .flex()
             .flex_col()
-            .gap(px(10.))
+            .gap(s(10.))
             .child(
                 div()
-                    .px(px(10.))
-                    .py(px(8.))
+                    .px(s(10.))
+                    .py(s(8.))
                     .border_1()
                     .border_color(theme::hairline_strong())
-                    .rounded(px(theme::RADIUS))
+                    .rounded(s(theme::RADIUS))
                     .bg(theme::raised())
                     .text_color(theme::marker(self.current_marker()))
                     .child(self.annotation_input.clone()),
@@ -562,9 +562,9 @@ impl Plate {
 
 fn section(title: &str, detail: Option<String>) -> Div {
     div()
-        .px(px(16.))
-        .pt(px(14.))
-        .pb(px(4.))
+        .px(s(16.))
+        .pt(s(14.))
+        .pb(s(4.))
         .flex()
         .justify_between()
         .border_t_1()

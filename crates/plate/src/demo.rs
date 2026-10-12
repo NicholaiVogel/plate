@@ -102,6 +102,7 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 app.draft.push(Shape::Rect { from: [0.3, 0.3], to: [0.5, 0.5], color: [0xff, 0x4d, 0x4d], width: 0.004 });
                 app.submit_comment(arg.to_string());
             }
+            "scale" => app.set_ui_scale(arg.parse().unwrap_or(1.4), cx),
             "toast" => app.show_toast("Saved /tmp/frame_1012.png".into()),
             _ => log::warn!("unknown demo step {name}"),
         }

@@ -1,7 +1,7 @@
 use super::widgets::{chip, icon_button, tag};
 use crate::app::{CompareMode, Modal, Plate};
-use crate::theme::{self, FONT_MONO};
-use gpui::{div, prelude::*, px, Context, FontWeight, Window};
+use crate::theme::{self, s, FONT_MONO};
+use gpui::{div, prelude::*, Context, FontWeight, Window};
 use plate_core::display::Channel;
 
 impl Plate {
@@ -20,7 +20,7 @@ impl Plate {
             parts.join("  ·  ")
         });
 
-        let mut controls = div().flex().flex_none().items_center().gap(px(6.));
+        let mut controls = div().flex().flex_none().items_center().gap(s(6.));
         if let Some(c) = clip {
             let view = format!("{} · {}", short_display(&c.choice.display), c.choice.view);
             let exposure = if self.exposure == 0.0 && (self.gamma - 1.0).abs() < 1e-4 {
@@ -54,7 +54,7 @@ impl Plate {
                     chip("chip-compare", "A/B", compare, self.compare.is_some() || self.modal == Some(Modal::Compare))
                         .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Compare, window, cx))),
                 )
-                .child(div().w(px(1.)).h(px(20.)).mx(px(4.)).bg(theme::hairline()))
+                .child(div().w(s(1.)).h(s(20.)).mx(s(4.)).bg(theme::hairline()))
                 .child(icon_button("save-frame", "save", false).on_click(cx.listener(|this, _, _, cx| this.save_frame(cx))));
         }
         controls = controls
@@ -66,14 +66,14 @@ impl Plate {
             .child(
                 div()
                     .id("help")
-                    .size(px(30.))
+                    .size(s(30.))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(theme::RADIUS))
+                    .rounded(s(theme::RADIUS))
                     .cursor_pointer()
                     .font_family(FONT_MONO)
-                    .text_size(px(13.))
+                    .text_size(s(13.))
                     .text_color(theme::ink_muted())
                     .hover(|s| s.bg(theme::hover()).text_color(theme::ink()))
                     .child("?")
@@ -81,13 +81,13 @@ impl Plate {
             );
 
         div()
-            .h(px(48.))
+            .h(s(48.))
             .flex_none()
             .flex()
             .items_center()
             .justify_between()
-            .gap(px(16.))
-            .px(px(12.))
+            .gap(s(16.))
+            .px(s(12.))
             .border_b_1()
             .border_color(theme::hairline())
             .child(
@@ -95,7 +95,7 @@ impl Plate {
                     .flex()
                     .flex_1()
                     .items_center()
-                    .gap(px(12.))
+                    .gap(s(12.))
                     .min_w_0()
                     .overflow_hidden()
                     .child(
@@ -103,17 +103,17 @@ impl Plate {
                             .id("bin-toggle")
                             .flex()
                             .items_center()
-                            .gap(px(8.))
+                            .gap(s(8.))
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.prefs.show_bin = !this.prefs.show_bin;
                                 cx.notify();
                             }))
                             .flex_none()
-                            .child(div().size(px(8.)).bg(theme::blue()))
-                            .child(div().font_family(FONT_MONO).font_weight(FontWeight::MEDIUM).text_size(px(12.)).child("PLATE")),
+                            .child(div().size(s(8.)).bg(theme::blue()))
+                            .child(div().font_family(FONT_MONO).font_weight(FontWeight::MEDIUM).text_size(s(12.)).child("PLATE")),
                     )
-                    .child(div().flex_none().w(px(1.)).h(px(20.)).bg(theme::hairline()))
+                    .child(div().flex_none().w(s(1.)).h(s(20.)).bg(theme::hairline()))
                     .child(match clip {
                         Some(c) => div()
                             .flex()
@@ -122,14 +122,14 @@ impl Plate {
                             .child(
                                 div()
                                     .font_weight(FontWeight::MEDIUM)
-                                    .text_size(px(13.))
+                                    .text_size(s(13.))
                                     .whitespace_nowrap()
                                     .overflow_hidden()
                                     .text_ellipsis()
                                     .child(c.info.name.clone()),
                             )
                             .child(tag(meta.unwrap_or_default()).whitespace_nowrap().overflow_hidden().text_ellipsis()),
-                        None => div().text_color(theme::ink_faint()).text_size(px(13.)).child("No media"),
+                        None => div().text_color(theme::ink_faint()).text_size(s(13.)).child("No media"),
                     }),
             )
             .child(controls)

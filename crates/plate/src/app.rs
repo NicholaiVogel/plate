@@ -309,6 +309,7 @@ const MIN_ZOOM: f32 = 0.02;
 impl Plate {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let prefs = Prefs::load();
+        crate::theme::set_ui_scale(prefs.ui_scale);
         let (color, warning) = ColorManager::load(&prefs.ocio);
         let cache = Arc::new(FrameCache::new((prefs.cache_gb as f64 * 1024.0 * 1024.0 * 1024.0) as usize));
         let audio = AudioPlayer::new();
@@ -1289,6 +1290,15 @@ impl Plate {
     }
 
     // ------------------------------------------------------------------- misc
+
+    /// Sets and persists the UI scale (Ctrl +/−).
+    pub fn set_ui_scale(&mut self, v: f32, cx: &mut Context<Self>) {
+        let v = crate::theme::set_ui_scale(v);
+        self.prefs.ui_scale = v;
+        self.prefs.save();
+        self.show_toast(format!("UI scale {:.0}%", v * 100.0));
+        cx.notify();
+    }
 
     pub fn show_toast(&mut self, text: String) {
         log::info!("{text}");

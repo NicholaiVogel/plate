@@ -1,7 +1,31 @@
 //! Biohazard Night Archive: black surfaces, white ink, clay-blue accent,
 //! blue-gray structure, hairline borders and near-square controls.
 
-use gpui::{rgb, rgba, Hsla, Rgba};
+use gpui::{px, rgb, rgba, Hsla, Pixels, Rgba};
+use std::sync::atomic::{AtomicU32, Ordering};
+
+/// UI scale factor (Ctrl +/−), applied to every chrome dimension through
+/// `s()`. Image-space geometry stays in raw `px` so 100% zoom still means one
+/// image pixel per device pixel.
+static UI_SCALE: AtomicU32 = AtomicU32::new(0x3f80_0000); // 1.0
+
+pub const UI_SCALE_MIN: f32 = 0.6;
+pub const UI_SCALE_MAX: f32 = 2.5;
+
+pub fn ui_scale() -> f32 {
+    f32::from_bits(UI_SCALE.load(Ordering::Relaxed))
+}
+
+pub fn set_ui_scale(v: f32) -> f32 {
+    let v = ((v.clamp(UI_SCALE_MIN, UI_SCALE_MAX)) * 20.0).round() / 20.0;
+    UI_SCALE.store(v.to_bits(), Ordering::Relaxed);
+    v
+}
+
+/// A UI length in logical pixels at the current UI scale.
+pub fn s(v: f32) -> Pixels {
+    px(v * ui_scale())
+}
 
 pub const FONT_UI: &str = "Inter Tight";
 pub const FONT_MONO: &str = "DM Mono";

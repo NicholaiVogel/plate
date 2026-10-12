@@ -1,7 +1,7 @@
 //! Small shared building blocks.
 
-use crate::theme::{self, FONT_MONO};
-use gpui::{div, prelude::*, px, svg, AppContext, Div, ElementId, SharedString, Stateful, Svg};
+use crate::theme::{self, s, FONT_MONO};
+use gpui::{div, prelude::*, svg, AppContext, Div, ElementId, SharedString, Stateful, Svg};
 
 /// SVG icons don't inherit text color in gpui, so every icon carries its own.
 pub fn icon(name: &str) -> Svg {
@@ -9,7 +9,7 @@ pub fn icon(name: &str) -> Svg {
 }
 
 pub fn icon_sized(name: &str, size: f32) -> Svg {
-    svg().path(SharedString::from(format!("icons/{name}.svg"))).size(px(size)).flex_none().text_color(theme::ink_muted())
+    svg().path(SharedString::from(format!("icons/{name}.svg"))).size(s(size)).flex_none().text_color(theme::ink_muted())
 }
 
 /// A square, borderless icon button.
@@ -21,12 +21,12 @@ pub fn icon_button_colored(id: impl Into<ElementId>, name: &str, active: bool, c
     div()
         .id(id)
         .group("icon-button")
-        .size(px(30.))
+        .size(s(30.))
         .flex()
         .flex_none()
         .items_center()
         .justify_center()
-        .rounded(px(theme::RADIUS))
+        .rounded(s(theme::RADIUS))
         .cursor_pointer()
         .when(active, |d| d.bg(theme::blue_soft()))
         .hover(|s| s.bg(theme::hover()))
@@ -35,30 +35,30 @@ pub fn icon_button_colored(id: impl Into<ElementId>, name: &str, active: bool, c
 
 /// Uppercase monospace label, the site's technical-tag voice.
 pub fn tag(text: impl Into<SharedString>) -> Div {
-    div().font_family(FONT_MONO).text_size(px(10.)).text_color(theme::ink_faint()).child(text.into())
+    div().font_family(FONT_MONO).text_size(s(10.)).text_color(theme::ink_faint()).child(text.into())
 }
 
 pub fn mono(text: impl Into<SharedString>) -> Div {
-    div().font_family(FONT_MONO).text_size(px(12.)).child(text.into())
+    div().font_family(FONT_MONO).text_size(s(12.)).child(text.into())
 }
 
 /// A top-bar control: small tag over a value, opening a modal on click.
 pub fn chip(id: impl Into<ElementId>, label: &str, value: impl Into<SharedString>, active: bool) -> Stateful<Div> {
     div()
         .id(id)
-        .h(px(30.))
-        .px(px(10.))
+        .h(s(30.))
+        .px(s(10.))
         .flex()
         .flex_none()
         .items_center()
-        .gap(px(8.))
+        .gap(s(8.))
         .border_1()
         .border_color(if active { theme::blue() } else { theme::hairline() })
-        .rounded(px(theme::RADIUS))
+        .rounded(s(theme::RADIUS))
         .cursor_pointer()
         .hover(|s| s.border_color(theme::hairline_strong()).bg(theme::hover()))
         .child(tag(label.to_uppercase()))
-        .child(div().text_size(px(12.)).text_color(theme::ink()).max_w(px(220.)).overflow_hidden().whitespace_nowrap().text_ellipsis().child(value.into()))
+        .child(div().text_size(s(12.)).text_color(theme::ink()).max_w(s(220.)).overflow_hidden().whitespace_nowrap().text_ellipsis().child(value.into()))
         .child(icon_sized("chevron-down", 12.).text_color(theme::ink_faint()))
 }
 
@@ -66,12 +66,12 @@ pub fn chip(id: impl Into<ElementId>, label: &str, value: impl Into<SharedString
 pub fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
     div()
         .id(id)
-        .px(px(10.))
-        .py(px(6.))
+        .px(s(10.))
+        .py(s(6.))
         .flex()
         .items_center()
-        .gap(px(8.))
-        .rounded(px(theme::RADIUS))
+        .gap(s(8.))
+        .rounded(s(theme::RADIUS))
         .cursor_pointer()
         .border_l_2()
         .border_color(if selected { theme::blue() } else { gpui::transparent_black().into() })
@@ -83,15 +83,15 @@ pub fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
     div()
         .id(id)
-        .h(px(28.))
-        .px(px(12.))
+        .h(s(28.))
+        .px(s(12.))
         .flex()
         .items_center()
         .justify_center()
         .border_1()
         .border_color(theme::hairline_strong())
-        .rounded(px(theme::RADIUS))
-        .text_size(px(12.))
+        .rounded(s(theme::RADIUS))
+        .text_size(s(12.))
         .cursor_pointer()
         .hover(|s| s.bg(theme::hover()).border_color(theme::ink_muted()))
         .child(label.into())
@@ -106,13 +106,13 @@ struct Tip(SharedString);
 impl gpui::Render for Tip {
     fn render(&mut self, _: &mut gpui::Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
         div()
-            .px(px(8.))
-            .py(px(4.))
+            .px(s(8.))
+            .py(s(4.))
             .bg(theme::raised())
             .border_1()
             .border_color(theme::hairline_strong())
-            .rounded(px(theme::RADIUS))
-            .text_size(px(11.))
+            .rounded(s(theme::RADIUS))
+            .text_size(s(11.))
             .text_color(theme::ink())
             .child(self.0.clone())
     }

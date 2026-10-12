@@ -1,7 +1,7 @@
 use super::widgets::{icon, icon_button, icon_sized, tag, TipExt};
 use crate::app::Plate;
-use crate::theme::{self, FONT_MONO};
-use gpui::{div, prelude::*, px, Context, FontWeight, MouseButton, SharedString, Window};
+use crate::theme::{self, s, FONT_MONO};
+use gpui::{div, prelude::*, Context, FontWeight, MouseButton, SharedString, Window};
 
 fn ago(created: u64) -> String {
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(created);
@@ -20,7 +20,7 @@ impl Plate {
         let count = clip.notes.comments.len();
         let open = clip.notes.comments.iter().filter(|c| !c.done).count();
 
-        let mut list = div().id("comment-list").flex_1().min_h_0().overflow_y_scroll().px(px(10.)).py(px(8.)).flex().flex_col().gap(px(6.));
+        let mut list = div().id("comment-list").flex_1().min_h_0().overflow_y_scroll().px(s(10.)).py(s(8.)).flex().flex_col().gap(s(6.));
         if count == 0 {
             list = list.child(
                 div()
@@ -29,8 +29,8 @@ impl Plate {
                     .flex_col()
                     .items_center()
                     .justify_center()
-                    .gap(px(10.))
-                    .pt(px(80.))
+                    .gap(s(10.))
+                    .pt(s(80.))
                     .child(icon_sized("message", 36.).text_color(theme::ink_faint()))
                     .child(div().text_color(theme::ink_muted()).child("No comments yet"))
                     .child(tag("ENTER TO WRITE  ·  D TO DRAW")),
@@ -51,11 +51,11 @@ impl Plate {
                     .group("comment")
                     .flex()
                     .flex_col()
-                    .gap(px(6.))
-                    .p(px(10.))
+                    .gap(s(6.))
+                    .p(s(10.))
                     .border_1()
                     .border_color(if focused { theme::blue() } else if on_frame { theme::hairline_strong() } else { theme::hairline() })
-                    .rounded(px(theme::RADIUS))
+                    .rounded(s(theme::RADIUS))
                     .when(focused, |d| d.bg(theme::structure()))
                     .when(c.done, |d| d.opacity(0.55))
                     .cursor_pointer()
@@ -71,29 +71,29 @@ impl Plate {
                         div()
                             .flex()
                             .items_center()
-                            .gap(px(8.))
+                            .gap(s(8.))
                             .child(
                                 div()
-                                    .px(px(6.))
-                                    .py(px(1.))
+                                    .px(s(6.))
+                                    .py(s(1.))
                                     .bg(if focused { theme::blue() } else { theme::structure() })
                                     .text_color(if focused { theme::paper() } else { theme::ink() })
                                     .font_family(FONT_MONO)
-                                    .text_size(px(11.))
+                                    .text_size(s(11.))
                                     .child(label),
                             )
-                            .child(div().font_weight(FontWeight::MEDIUM).text_size(px(12.)).child(c.author.clone()))
-                            .child(div().text_size(px(11.)).text_color(theme::ink_faint()).child(ago(c.created)))
+                            .child(div().font_weight(FontWeight::MEDIUM).text_size(s(12.)).child(c.author.clone()))
+                            .child(div().text_size(s(11.)).text_color(theme::ink_faint()).child(ago(c.created)))
                             .child(div().flex_1())
                             .child(
                                 div()
                                     .flex()
-                                    .gap(px(0.))
+                                    .gap(s(0.))
                                     .invisible()
                                     .group_hover("comment", |s| s.visible())
                                     .child(
                                         icon_button(SharedString::from(format!("done-{}", c.id)), "check", c.done)
-                                            .size(px(24.))
+                                            .size(s(24.))
                                             .tip(if c.done { "Reopen" } else { "Mark done" })
                                             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                                             .on_click(cx.listener(move |this, _, _, cx| {
@@ -104,7 +104,7 @@ impl Plate {
                                     )
                                     .child(
                                         icon_button(SharedString::from(format!("del-{}", c.id)), "trash", false)
-                                            .size(px(24.))
+                                            .size(s(24.))
                                             .tip("Delete")
                                             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                                             .on_click(cx.listener(move |this, _, _, cx| {
@@ -115,16 +115,16 @@ impl Plate {
                                     ),
                             ),
                     )
-                    .when(!c.text.is_empty(), |d| d.child(div().text_size(px(13.)).line_height(px(18.)).child(c.text.clone())))
+                    .when(!c.text.is_empty(), |d| d.child(div().text_size(s(13.)).line_height(s(18.)).child(c.text.clone())))
                     .when(marks > 0, |d| {
                         d.child(
                             div()
                                 .flex()
                                 .items_center()
-                                .gap(px(6.))
+                                .gap(s(6.))
                                 .text_color(theme::ink_faint())
                                 .child(icon_sized("pencil", 12.).text_color(theme::ink_faint()))
-                                .child(div().text_size(px(11.)).child(format!("{marks} mark{}", if marks == 1 { "" } else { "s" }))),
+                                .child(div().text_size(s(11.)).child(format!("{marks} mark{}", if marks == 1 { "" } else { "s" }))),
                         )
                     }),
             );
@@ -135,7 +135,7 @@ impl Plate {
         let current = self.current_marker();
 
         div()
-            .w(px(340.))
+            .w(s(340.))
             .flex_none()
             .flex()
             .flex_col()
@@ -143,9 +143,9 @@ impl Plate {
             .border_color(theme::hairline())
             .child(
                 div()
-                    .h(px(44.))
+                    .h(s(44.))
                     .flex_none()
-                    .px(px(14.))
+                    .px(s(14.))
                     .flex()
                     .items_center()
                     .justify_between()
@@ -155,7 +155,7 @@ impl Plate {
                         div()
                             .flex()
                             .items_center()
-                            .gap(px(8.))
+                            .gap(s(8.))
                             .child(div().font_weight(FontWeight::MEDIUM).child("Comments"))
                             .child(tag(format!("{open} OPEN · {count} TOTAL"))),
                     )
@@ -178,38 +178,38 @@ impl Plate {
                     .flex_none()
                     .border_t_1()
                     .border_color(theme::hairline())
-                    .p(px(10.))
+                    .p(s(10.))
                     .flex()
                     .flex_col()
-                    .gap(px(8.))
+                    .gap(s(8.))
                     .child(
                         div()
                             .id("composer")
                             .flex()
                             .items_center()
-                            .gap(px(8.))
-                            .px(px(8.))
-                            .py(px(7.))
+                            .gap(s(8.))
+                            .px(s(8.))
+                            .py(s(7.))
                             .border_1()
                             .border_color(theme::hairline_strong())
-                            .rounded(px(theme::RADIUS))
+                            .rounded(s(theme::RADIUS))
                             .bg(theme::raised())
                             .child(
                                 div()
-                                    .px(px(5.))
+                                    .px(s(5.))
                                     .bg(theme::blue())
                                     .text_color(theme::paper())
                                     .font_family(FONT_MONO)
-                                    .text_size(px(11.))
+                                    .text_size(s(11.))
                                     .child(self.frame_text(pinned)),
                             )
-                            .child(div().flex_1().min_w_0().text_size(px(13.)).child(self.comment_input.clone())),
+                            .child(div().flex_1().min_w_0().text_size(s(13.)).child(self.comment_input.clone())),
                     )
                     .child(
                         div()
                             .flex()
                             .items_center()
-                            .gap(px(2.))
+                            .gap(s(2.))
                             .child(icon_button("composer-draw", "pencil", self.drawing).tip("Annotate this frame  (D)").on_click(cx.listener(|this, _, window, cx| {
                                 this.drawing = !this.drawing;
                                 if this.drawing {
@@ -221,14 +221,14 @@ impl Plate {
                             .child(
                                 div()
                                     .id("composer-color")
-                                    .size(px(30.))
+                                    .size(s(30.))
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .rounded(px(theme::RADIUS))
+                                    .rounded(s(theme::RADIUS))
                                     .cursor_pointer()
                                     .hover(|s| s.bg(theme::hover()))
-                                    .child(div().size(px(12.)).rounded(px(6.)).bg(theme::marker(current)).border_1().border_color(theme::hairline_strong()))
+                                    .child(div().size(s(12.)).rounded(s(6.)).bg(theme::marker(current)).border_1().border_color(theme::hairline_strong()))
                                     .tip("Annotation color  (X while drawing)")
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.prefs.annotation_color = (this.prefs.annotation_color + 1) % theme::MARKERS.len();
@@ -237,12 +237,12 @@ impl Plate {
                                     })),
                             )
                             .when(draft_marks > 0, |d| {
-                                d.child(div().ml(px(4.)).text_size(px(11.)).text_color(theme::ink_muted()).child(format!(
+                                d.child(div().ml(s(4.)).text_size(s(11.)).text_color(theme::ink_muted()).child(format!(
                                     "{draft_marks} mark{} on {}",
                                     if draft_marks == 1 { "" } else { "s" },
                                     self.frame_text(pinned)
                                 )))
-                                .child(icon_button("composer-undo", "undo", false).size(px(26.)).tip("Undo mark").on_click(cx.listener(|this, _, _, cx| {
+                                .child(icon_button("composer-undo", "undo", false).size(s(26.)).tip("Undo mark").on_click(cx.listener(|this, _, _, cx| {
                                     this.undo_shape();
                                     cx.notify();
                                 })))
@@ -251,11 +251,11 @@ impl Plate {
                             .child(
                                 div()
                                     .id("send")
-                                    .size(px(30.))
+                                    .size(s(30.))
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .rounded(px(theme::RADIUS))
+                                    .rounded(s(theme::RADIUS))
                                     .bg(theme::blue())
                                     .text_color(theme::paper())
                                     .cursor_pointer()

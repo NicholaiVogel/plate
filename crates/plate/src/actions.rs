@@ -64,6 +64,9 @@ actions!(
         NextColor,
         ColorspaceModal,
         DisplayModal,
+        UiScaleUp,
+        UiScaleDown,
+        UiScaleReset,
     ]
 );
 
@@ -132,6 +135,11 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("f11", ToggleFullscreen, g),
         KeyBinding::new("ctrl-i", ColorspaceModal, g),
         KeyBinding::new("ctrl-d", DisplayModal, g),
+        KeyBinding::new("ctrl-=", UiScaleUp, g),
+        KeyBinding::new("ctrl-+", UiScaleUp, g),
+        KeyBinding::new("ctrl-shift-=", UiScaleUp, g),
+        KeyBinding::new("ctrl--", UiScaleDown, g),
+        KeyBinding::new("ctrl-0", UiScaleReset, g),
     ]);
 }
 
@@ -184,6 +192,7 @@ pub const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Tab  Shift Tab", "Comments panel · bin"),
             ("Ctrl I  Ctrl D", "Input colorspace · display/view"),
             ("F11", "Fullscreen"),
+            ("Ctrl +  Ctrl −  Ctrl 0", "UI scale up · down · reset"),
         ],
     ),
 ];

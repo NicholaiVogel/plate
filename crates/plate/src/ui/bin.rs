@@ -1,7 +1,7 @@
 use super::widgets::{icon, icon_button, row, tag, TipExt};
 use crate::app::{dir_title, Bin, Plate};
-use crate::theme;
-use gpui::{div, prelude::*, px, Context, FontWeight, Window};
+use crate::theme::{self, s};
+use gpui::{div, prelude::*, Context, FontWeight, Window};
 use plate_core::scan::{self, EntryKind};
 
 impl Plate {
@@ -10,7 +10,7 @@ impl Plate {
         let current = self.clip.as_ref().map(|c| c.info.path.clone());
         let parent = bin.dir.as_ref().and_then(|d| d.parent().map(|p| p.to_path_buf()));
 
-        let mut list = div().id("bin-list").flex_1().min_h_0().overflow_y_scroll().p(px(6.)).flex().flex_col().gap(px(1.));
+        let mut list = div().id("bin-list").flex_1().min_h_0().overflow_y_scroll().p(s(6.)).flex().flex_col().gap(s(1.));
         for (i, e) in bin.entries.iter().enumerate() {
             let selected = current.as_ref().is_some_and(|c| match &e.kind {
                 EntryKind::Sequence(seq) => {
@@ -47,7 +47,7 @@ impl Plate {
                             .flex()
                             .flex_col()
                             .min_w_0()
-                            .child(div().text_size(px(12.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(name))
+                            .child(div().text_size(s(12.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(name))
                             .children(sub.map(|s| tag(s).whitespace_nowrap().overflow_hidden().text_ellipsis())),
                     )
                     .on_click(cx.listener(move |this, _, window, cx| {
@@ -57,11 +57,11 @@ impl Plate {
             );
         }
         if bin.entries.is_empty() {
-            list = list.child(div().p(px(12.)).text_color(theme::ink_faint()).text_size(px(12.)).child("No media in this folder"));
+            list = list.child(div().p(s(12.)).text_color(theme::ink_faint()).text_size(s(12.)).child("No media in this folder"));
         }
 
         div()
-            .w(px(270.))
+            .w(s(270.))
             .flex_none()
             .flex()
             .flex_col()
@@ -69,12 +69,12 @@ impl Plate {
             .border_color(theme::hairline())
             .child(
                 div()
-                    .h(px(44.))
+                    .h(s(44.))
                     .flex_none()
-                    .px(px(10.))
+                    .px(s(10.))
                     .flex()
                     .items_center()
-                    .gap(px(6.))
+                    .gap(s(6.))
                     .border_b_1()
                     .border_color(theme::hairline())
                     .child(

@@ -53,6 +53,7 @@ subfolders. Encrypted DCPs (KDM) are not supported.
 - `Ctrl S` saves the displayed frame at full resolution with the view
   transform, channel and annotations burned in (PNG, JPEG or TIFF).
 
+`Ctrl +` / `Ctrl −` / `Ctrl 0` scale the whole UI (remembered across restarts).
 Press `?` in the app for every shortcut.
 
 ## Build

@@ -1,6 +1,6 @@
 use super::widgets::{icon_button, mono, tag, TipExt};
 use crate::app::{image_rect, CompareMode, Drag, Modal, Plate, Probe, SlotView, Tool};
-use crate::theme::{self, FONT_MONO};
+use crate::theme::{self, s, FONT_MONO};
 use gpui::{
     canvas, div, fill, point, prelude::*, px, Bounds, ContentMask, Context, Corners, Hsla, MouseButton,
     MouseDownEvent, MouseMoveEvent, PathBuilder, Pixels, Point, ScrollWheelEvent, Window,
@@ -57,16 +57,16 @@ impl Plate {
                         window.with_content_mask(Some(ContentMask { bounds: left }), |w| paint_slot(w, &a.view, rect_a));
                         // B is stretched onto A's frame so the wipe compares like for like.
                         window.with_content_mask(Some(ContentMask { bounds: right }), |w| paint_slot(w, &b.view, rect_a));
-                        let line = Bounds { origin: point(split, bounds.origin.y), size: gpui::size(px(1.), bounds.size.height) };
+                        let line = Bounds { origin: point(split, bounds.origin.y), size: gpui::size(s(1.), bounds.size.height) };
                         window.paint_quad(fill(line, theme::ink()));
-                        let handle = Bounds::centered_at(point(split, bounds.center().y), gpui::size(px(12.), px(28.)));
+                        let handle = Bounds::centered_at(point(split, bounds.center().y), gpui::size(s(12.), s(28.)));
                         window.paint_quad(fill(handle, theme::ink()));
                     }
                     (Some(b), CompareMode::SideBySide) => {
                         window.with_content_mask(Some(ContentMask { bounds: area(0) }), |w| paint_slot(w, &a.view, rect_a));
                         let rect_b = image_rect(area(1), b.width, b.height, b.aspect, zoom, pan, scale_factor);
                         window.with_content_mask(Some(ContentMask { bounds: area(1) }), |w| paint_slot(w, &b.view, rect_b));
-                        let line = Bounds { origin: point(area(1).origin.x, bounds.origin.y), size: gpui::size(px(1.), bounds.size.height) };
+                        let line = Bounds { origin: point(area(1).origin.x, bounds.origin.y), size: gpui::size(s(1.), bounds.size.height) };
                         window.paint_quad(fill(line, theme::hairline_strong()));
                     }
                     _ => paint_slot(window, &a.view, rect_a),
@@ -78,10 +78,10 @@ impl Plate {
                     }
                     if let Some(p) = probe_pos {
                         let c = theme::ink();
-                        window.paint_quad(fill(Bounds { origin: point(p.x - px(9.), p.y), size: gpui::size(px(6.), px(1.)) }, c));
-                        window.paint_quad(fill(Bounds { origin: point(p.x + px(4.), p.y), size: gpui::size(px(6.), px(1.)) }, c));
-                        window.paint_quad(fill(Bounds { origin: point(p.x, p.y - px(9.)), size: gpui::size(px(1.), px(6.)) }, c));
-                        window.paint_quad(fill(Bounds { origin: point(p.x, p.y + px(4.)), size: gpui::size(px(1.), px(6.)) }, c));
+                        window.paint_quad(fill(Bounds { origin: point(p.x - s(9.), p.y), size: gpui::size(s(6.), s(1.)) }, c));
+                        window.paint_quad(fill(Bounds { origin: point(p.x + s(4.), p.y), size: gpui::size(s(6.), s(1.)) }, c));
+                        window.paint_quad(fill(Bounds { origin: point(p.x, p.y - s(9.)), size: gpui::size(s(1.), s(6.)) }, c));
+                        window.paint_quad(fill(Bounds { origin: point(p.x, p.y + s(4.)), size: gpui::size(s(1.), s(6.)) }, c));
                     }
                 });
             },
@@ -283,12 +283,12 @@ impl Plate {
         layer = layer.child(
             div()
                 .absolute()
-                .left(px(14.))
-                .bottom(px(12.))
+                .left(s(14.))
+                .bottom(s(12.))
                 .flex()
                 .items_center()
-                .gap(px(10.))
-                .child(div().text_size(px(15.)).text_color(theme::ink()).child(clip.info.name.clone()))
+                .gap(s(10.))
+                .child(div().text_size(s(15.)).text_color(theme::ink()).child(clip.info.name.clone()))
                 .when(!status.is_empty(), |d| d.child(tag(status))),
         );
 
@@ -296,16 +296,16 @@ impl Plate {
             let label = |text: String, right: bool| {
                 div()
                     .absolute()
-                    .top(px(12.))
-                    .when(right, |d| d.right(px(14.)))
-                    .when(!right, |d| d.left(px(14.)))
-                    .px(px(8.))
-                    .py(px(3.))
+                    .top(s(12.))
+                    .when(right, |d| d.right(s(14.)))
+                    .when(!right, |d| d.left(s(14.)))
+                    .px(s(8.))
+                    .py(s(3.))
                     .bg(theme::scrim())
                     .border_1()
                     .border_color(theme::hairline())
                     .font_family(FONT_MONO)
-                    .text_size(px(11.))
+                    .text_size(s(11.))
                     .child(text)
             };
             layer = layer
@@ -326,14 +326,14 @@ impl Plate {
                             .flex()
                             .flex_col()
                             .items_center()
-                            .gap(px(6.))
-                            .px(px(20.))
-                            .py(px(14.))
+                            .gap(s(6.))
+                            .px(s(20.))
+                            .py(s(14.))
                             .border_1()
                             .border_color(theme::warn())
                             .bg(theme::scrim())
                             .child(mono(format!("MISSING FRAME {}", self.frame_text(self.frame))).text_color(theme::warn()))
-                            .child(div().text_size(px(12.)).text_color(theme::ink_muted()).max_w(px(420.)).child(err)),
+                            .child(div().text_size(s(12.)).text_color(theme::ink_muted()).max_w(s(420.)).child(err)),
                     ),
             );
         }
@@ -348,8 +348,8 @@ impl Plate {
                 lines.push(format!("disp {}  {}  {}", fmt(s[0]), fmt(s[1]), fmt(s[2])));
                 lines.push(format!("8bit {:>4} {:>4} {:>4}", (s[0] * 255.0).round(), (s[1] * 255.0).round(), (s[2] * 255.0).round()));
             }
-            let x = p.pos.x - origin.x + px(16.);
-            let y = p.pos.y - origin.y + px(16.);
+            let x = p.pos.x - origin.x + s(16.);
+            let y = p.pos.y - origin.y + s(16.);
             let swatch = p.shown.map(|s| gpui::Rgba { r: s[0], g: s[1], b: s[2], a: 1.0 });
             layer = layer.child(
                 div()
@@ -357,14 +357,14 @@ impl Plate {
                     .left(x)
                     .top(y)
                     .flex()
-                    .gap(px(8.))
-                    .px(px(10.))
-                    .py(px(8.))
+                    .gap(s(8.))
+                    .px(s(10.))
+                    .py(s(8.))
                     .bg(theme::scrim())
                     .border_1()
                     .border_color(theme::hairline_strong())
-                    .children(swatch.map(|c| div().size(px(28.)).bg(c).border_1().border_color(theme::hairline_strong())))
-                    .child(div().flex().flex_col().font_family(FONT_MONO).text_size(px(11.)).children(lines.into_iter().map(|l| div().child(l)))),
+                    .children(swatch.map(|c| div().size(s(28.)).bg(c).border_1().border_color(theme::hairline_strong())))
+                    .child(div().flex().flex_col().font_family(FONT_MONO).text_size(s(11.)).children(lines.into_iter().map(|l| div().child(l)))),
             );
         }
 
@@ -397,21 +397,21 @@ impl Plate {
         let mut bar = div()
             .id("draw-toolbar")
             .absolute()
-            .top(px(12.))
-            .left(px(0.))
-            .right(px(0.))
+            .top(s(12.))
+            .left(s(0.))
+            .right(s(0.))
             .flex()
             .justify_center()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation());
         let mut island = div()
             .flex()
             .items_center()
-            .gap(px(2.))
-            .p(px(4.))
+            .gap(s(2.))
+            .p(s(4.))
             .bg(theme::raised())
             .border_1()
             .border_color(theme::hairline_strong())
-            .rounded(px(theme::RADIUS));
+            .rounded(s(theme::RADIUS));
         for tool in Tool::ALL {
             island = island.child(
                 div()
@@ -427,30 +427,30 @@ impl Plate {
                     .child(
                         div()
                             .absolute()
-                            .right(px(2.))
-                            .bottom(px(0.))
+                            .right(s(2.))
+                            .bottom(s(0.))
                             .font_family(FONT_MONO)
-                            .text_size(px(8.))
+                            .text_size(s(8.))
                             .text_color(theme::ink_faint())
                             .child(tool.key()),
                     ),
             );
         }
-        island = island.child(div().w(px(1.)).h(px(20.)).mx(px(4.)).bg(theme::hairline()));
+        island = island.child(div().w(s(1.)).h(s(20.)).mx(s(4.)).bg(theme::hairline()));
         for (i, c) in theme::MARKERS.iter().enumerate() {
             let selected = *c == current;
             island = island.child(
                 div()
                     .id(("marker", i))
-                    .size(px(22.))
+                    .size(s(22.))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(theme::RADIUS))
+                    .rounded(s(theme::RADIUS))
                     .cursor_pointer()
                     .when(selected, |d| d.border_1().border_color(theme::ink()))
                     .hover(|s| s.bg(theme::hover()))
-                    .child(div().size(px(12.)).rounded(px(6.)).bg(theme::marker(*c)).border_1().border_color(theme::hairline_strong()))
+                    .child(div().size(s(12.)).rounded(s(6.)).bg(theme::marker(*c)).border_1().border_color(theme::hairline_strong()))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.prefs.annotation_color = i;
                         this.prefs.save();
@@ -458,20 +458,20 @@ impl Plate {
                     })),
             );
         }
-        island = island.child(div().w(px(1.)).h(px(20.)).mx(px(4.)).bg(theme::hairline()));
+        island = island.child(div().w(s(1.)).h(s(20.)).mx(s(4.)).bg(theme::hairline()));
         for (i, (w, label)) in [(2.5f32, "S"), (4.0, "M"), (7.0, "L")].into_iter().enumerate() {
             let selected = (self.prefs.stroke_width - w).abs() < 0.1;
             island = island.child(
                 div()
                     .id(("stroke", i))
-                    .size(px(24.))
+                    .size(s(24.))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(theme::RADIUS))
+                    .rounded(s(theme::RADIUS))
                     .cursor_pointer()
                     .font_family(FONT_MONO)
-                    .text_size(px(11.))
+                    .text_size(s(11.))
                     .text_color(if selected { theme::blue() } else { theme::ink_muted() })
                     .when(selected, |d| d.bg(theme::blue_soft()))
                     .hover(|s| s.bg(theme::hover()))
@@ -484,7 +484,7 @@ impl Plate {
             );
         }
         island = island
-            .child(div().w(px(1.)).h(px(20.)).mx(px(4.)).bg(theme::hairline()))
+            .child(div().w(s(1.)).h(s(20.)).mx(s(4.)).bg(theme::hairline()))
             .child(icon_button("undo-shape", "undo", false).tip("Undo  (Ctrl Z)").on_click(cx.listener(|this, _, _, cx| {
                 this.undo_shape();
                 cx.notify();
@@ -510,19 +510,19 @@ impl Plate {
             .flex_col()
             .items_center()
             .justify_center()
-            .gap(px(18.))
+            .gap(s(18.))
             .child(icon_sized_muted("film"))
-            .child(div().text_size(px(20.)).child("Drop media here"))
+            .child(div().text_size(s(20.)).child("Drop media here"))
             .child(
                 div()
-                    .text_size(px(13.))
+                    .text_size(s(13.))
                     .text_color(theme::ink_muted())
                     .child("Movies, image sequences, EXR, DPX, QuickTime, DCP folders"),
             )
             .child(
                 div()
                     .flex()
-                    .gap(px(8.))
+                    .gap(s(8.))
                     .child(super::widgets::primary_button("empty-open", "Open files").on_click(cx.listener(|this, _, _, cx| this.prompt_open(false, cx))))
                     .child(super::widgets::button("empty-folder", "Open folder").on_click(cx.listener(|this, _, _, cx| this.prompt_open(true, cx)))),
             )

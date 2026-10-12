@@ -1,7 +1,7 @@
 use super::widgets::{icon_button, icon_button_colored, icon_sized, TipExt};
 use crate::app::{CounterMode, Drag, Plate};
-use crate::theme::{self, FONT_MONO};
-use gpui::{canvas, div, fill, point, prelude::*, px, Bounds, Context, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Window};
+use crate::theme::{self, s, FONT_MONO};
+use gpui::{canvas, div, fill, point, prelude::*, Bounds, Context, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Window};
 
 impl Plate {
     pub(super) fn render_transport(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -47,15 +47,15 @@ impl Plate {
                 // The hit area is taller than the track; the track itself is thin.
                 bounds_cell.set(bounds);
                 let Some((count, cached, range, marks, draft)) = data else {
-                    let track = Bounds { origin: point(bounds.origin.x, bounds.center().y - px(1.)), size: gpui::size(bounds.size.width, px(2.)) };
+                    let track = Bounds { origin: point(bounds.origin.x, bounds.center().y - s(1.)), size: gpui::size(bounds.size.width, s(2.)) };
                     window.paint_quad(fill(track, theme::hairline()));
                     return;
                 };
                 let w = f32::from(bounds.size.width);
-                let x_of = |f: u64| bounds.origin.x + px(w * f as f32 / count as f32);
+                let x_of = |f: u64| bounds.origin.x + s(w * f as f32 / count as f32);
                 let frame_w = (w / count as f32).max(1.0);
-                let track_y = bounds.origin.y + px(14.);
-                let track = Bounds { origin: point(bounds.origin.x, track_y), size: gpui::size(bounds.size.width, px(4.)) };
+                let track_y = bounds.origin.y + s(14.);
+                let track = Bounds { origin: point(bounds.origin.x, track_y), size: gpui::size(bounds.size.width, s(4.)) };
                 window.paint_quad(fill(track, theme::hairline()));
 
                 // Cached frames, merged into runs.
@@ -68,7 +68,7 @@ impl Plate {
                         }
                         let r = Bounds {
                             origin: point(x_of(start as u64), track_y),
-                            size: gpui::size(px((w * (i - start) as f32 / count as f32).max(1.0)), px(4.)),
+                            size: gpui::size(s((w * (i - start) as f32 / count as f32).max(1.0)), s(4.)),
                         };
                         window.paint_quad(fill(r, theme::blue_soft()));
                     } else {
@@ -76,47 +76,47 @@ impl Plate {
                     }
                 }
                 // Played portion.
-                let played = Bounds { origin: point(bounds.origin.x, track_y + px(1.)), size: gpui::size(x_of(frame) - bounds.origin.x, px(2.)) };
+                let played = Bounds { origin: point(bounds.origin.x, track_y + s(1.)), size: gpui::size(x_of(frame) - bounds.origin.x, s(2.)) };
                 window.paint_quad(fill(played, theme::blue()));
 
                 if let Some((a, b)) = range {
-                    let r = Bounds::from_corners(point(x_of(a), track_y - px(5.)), point(x_of(b + 1), track_y - px(3.)));
+                    let r = Bounds::from_corners(point(x_of(a), track_y - s(5.)), point(x_of(b + 1), track_y - s(3.)));
                     window.paint_quad(fill(r, theme::blue()));
                     for (x, left) in [(x_of(a), true), (x_of(b + 1), false)] {
-                        let tick = Bounds { origin: point(if left { x } else { x - px(2.) }, track_y - px(7.)), size: gpui::size(px(2.), px(13.)) };
+                        let tick = Bounds { origin: point(if left { x } else { x - s(2.) }, track_y - s(7.)), size: gpui::size(s(2.), s(13.)) };
                         window.paint_quad(fill(tick, theme::blue()));
                     }
                 }
                 for (f, done) in marks {
-                    let cx = x_of(f) + px(frame_w / 2.);
+                    let cx = x_of(f) + s(frame_w / 2.);
                     let size = if Some(f) == focused_frame { 9. } else { 7. };
-                    let m = Bounds::centered_at(point(cx, track_y + px(13.)), gpui::size(px(size), px(size)));
+                    let m = Bounds::centered_at(point(cx, track_y + s(13.)), gpui::size(s(size), s(size)));
                     let color = if done { theme::ink_faint() } else { theme::warn() };
-                    window.paint_quad(fill(m, color).corner_radii(px(size / 2.)));
+                    window.paint_quad(fill(m, color).corner_radii(s(size / 2.)));
                 }
                 if let Some(f) = draft {
-                    let m = Bounds::centered_at(point(x_of(f) + px(frame_w / 2.), track_y + px(13.)), gpui::size(px(7.), px(7.)));
-                    window.paint_quad(fill(m, theme::ink()).corner_radii(px(3.5)));
+                    let m = Bounds::centered_at(point(x_of(f) + s(frame_w / 2.), track_y + s(13.)), gpui::size(s(7.), s(7.)));
+                    window.paint_quad(fill(m, theme::ink()).corner_radii(s(3.5)));
                 }
                 // Playhead: the frame's slot, faint, with a crisp line and knob.
                 if frame_w >= 4.0 {
-                    let slot = Bounds { origin: point(x_of(frame), track_y - px(4.)), size: gpui::size(px(frame_w), px(12.)) };
+                    let slot = Bounds { origin: point(x_of(frame), track_y - s(4.)), size: gpui::size(s(frame_w), s(12.)) };
                     window.paint_quad(fill(slot, theme::hover()));
                 }
-                let x = x_of(frame) + px((frame_w / 2.0).min(frame_w - 1.0).max(0.0));
-                let line = Bounds { origin: point(x - px(1.), bounds.origin.y + px(6.)), size: gpui::size(px(2.), px(20.)) };
+                let x = x_of(frame) + s((frame_w / 2.0).min(frame_w - 1.0).max(0.0));
+                let line = Bounds { origin: point(x - s(1.), bounds.origin.y + s(6.)), size: gpui::size(s(2.), s(20.)) };
                 window.paint_quad(fill(line, theme::ink()));
-                let knob = Bounds::centered_at(point(x, bounds.origin.y + px(6.)), gpui::size(px(10.), px(6.)));
-                window.paint_quad(fill(knob, theme::ink()).corner_radii(px(1.)));
+                let knob = Bounds::centered_at(point(x, bounds.origin.y + s(6.)), gpui::size(s(10.), s(6.)));
+                window.paint_quad(fill(knob, theme::ink()).corner_radii(s(1.)));
             },
         )
         .size_full();
 
         div()
             .id("timeline")
-            .h(px(32.))
-            .mx(px(14.))
-            .mt(px(4.))
+            .h(s(32.))
+            .mx(s(14.))
+            .mt(s(4.))
             .cursor(gpui::CursorStyle::PointingHand)
             .on_mouse_down(MouseButton::Left, cx.listener(|this, ev: &MouseDownEvent, window, cx| {
                 this.focus_viewer(window);
@@ -166,8 +166,8 @@ impl Plate {
         let comments_open = self.prefs.show_comments;
 
         div()
-            .h(px(46.))
-            .px(px(10.))
+            .h(s(46.))
+            .px(s(10.))
             .flex()
             .items_center()
             .justify_between()
@@ -175,7 +175,7 @@ impl Plate {
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(2.))
+                    .gap(s(2.))
                     .flex_1()
                     .child(icon_button("step-back", "step-back", false).tip("Previous frame  (←)").on_click(cx.listener(|this, _, _, cx| {
                         this.step(-1);
@@ -203,14 +203,14 @@ impl Plate {
                     .child(
                         div()
                             .id("speed")
-                            .h(px(30.))
-                            .px(px(8.))
+                            .h(s(30.))
+                            .px(s(8.))
                             .flex()
                             .items_center()
-                            .rounded(px(theme::RADIUS))
+                            .rounded(s(theme::RADIUS))
                             .cursor_pointer()
                             .font_family(FONT_MONO)
-                            .text_size(px(12.))
+                            .text_size(s(12.))
                             .text_color(theme::ink_muted())
                             .hover(|s| s.bg(theme::hover()).text_color(theme::ink()))
                             .child(speed)
@@ -242,7 +242,7 @@ impl Plate {
                                 cx.notify();
                             }))
                             .on_scroll_wheel(cx.listener(|this, ev: &gpui::ScrollWheelEvent, _, cx| {
-                                let dy = f32::from(ev.delta.pixel_delta(px(20.)).y);
+                                let dy = f32::from(ev.delta.pixel_delta(s(20.)).y);
                                 this.prefs.volume = (this.prefs.volume - dy / 400.0).clamp(0.0, 1.5);
                                 this.audio.set_volume(this.prefs.volume);
                                 cx.notify();
@@ -251,10 +251,10 @@ impl Plate {
                     .when(has_audio && !muted, |d| {
                         d.child(
                             div()
-                                .w(px(44.))
-                                .h(px(3.))
+                                .w(s(44.))
+                                .h(s(3.))
                                 .bg(theme::hairline())
-                                .child(div().h_full().w(px(44. * (volume / 1.5).clamp(0.0, 1.0))).bg(theme::ink_muted())),
+                                .child(div().h_full().w(s(44. * (volume / 1.5).clamp(0.0, 1.0))).bg(theme::ink_muted())),
                         )
                     }),
             )
@@ -263,15 +263,15 @@ impl Plate {
                     .id("counter")
                     .flex()
                     .items_center()
-                    .gap(px(10.))
-                    .px(px(10.))
-                    .h(px(30.))
-                    .rounded(px(theme::RADIUS))
+                    .gap(s(10.))
+                    .px(s(10.))
+                    .h(s(30.))
+                    .rounded(s(theme::RADIUS))
                     .cursor_pointer()
                     .hover(|s| s.bg(theme::hover()))
-                    .child(div().font_family(FONT_MONO).text_size(px(13.)).child(counter))
+                    .child(div().font_family(FONT_MONO).text_size(s(13.)).child(counter))
                     .child(
-                        div().font_family(FONT_MONO).text_size(px(10.)).text_color(theme::ink_faint()).child(match self.counter {
+                        div().font_family(FONT_MONO).text_size(s(10.)).text_color(theme::ink_faint()).child(match self.counter {
                             CounterMode::Frames => "FRAME",
                             CounterMode::Timecode => "TC",
                             CounterMode::Index => "COUNT",
@@ -294,13 +294,13 @@ impl Plate {
                     .flex_1()
                     .justify_end()
                     .items_center()
-                    .gap(px(2.))
+                    .gap(s(2.))
                     .children(range.map(|r| {
                         div()
                             .id("range")
-                            .mr(px(8.))
+                            .mr(s(8.))
                             .font_family(FONT_MONO)
-                            .text_size(px(11.))
+                            .text_size(s(11.))
                             .text_color(theme::blue())
                             .cursor_pointer()
                             .child(r)

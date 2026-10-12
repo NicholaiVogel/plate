@@ -10,8 +10,8 @@ pub mod widgets;
 
 use crate::actions::*;
 use crate::app::{CompareMode, Drag, Modal, Plate, Tool};
-use crate::theme::{self, FONT_UI};
-use gpui::{div, prelude::*, px, Context, ExternalPaths, Focusable, MouseButton, Window};
+use crate::theme::{self, s, FONT_UI};
+use gpui::{div, prelude::*, Context, ExternalPaths, Focusable, MouseButton, Window};
 use plate_core::display::Channel;
 use std::time::Instant;
 
@@ -278,7 +278,7 @@ impl Render for Plate {
             .bg(theme::paper())
             .text_color(theme::ink())
             .font_family(FONT_UI)
-            .text_size(px(13.))
+            .text_size(s(13.))
             .key_context("Plate")
             .on_action(cx.listener(|this, _: &OpenFile, _, cx| this.prompt_open(false, cx)))
             .on_action(cx.listener(|this, _: &OpenFolder, _, cx| this.prompt_open(true, cx)))
@@ -290,6 +290,9 @@ impl Render for Plate {
                 cx.notify();
             }))
             .on_action(cx.listener(|_, _: &ToggleFullscreen, window, _| window.toggle_fullscreen()))
+            .on_action(cx.listener(|this, _: &UiScaleUp, _, cx| this.set_ui_scale(theme::ui_scale() + 0.1, cx)))
+            .on_action(cx.listener(|this, _: &UiScaleDown, _, cx| this.set_ui_scale(theme::ui_scale() - 0.1, cx)))
+            .on_action(cx.listener(|this, _: &UiScaleReset, _, cx| this.set_ui_scale(1.0, cx)))
             .on_action(cx.listener(|this, _: &ColorspaceModal, window, cx| {
                 if this.clip.is_some() {
                     this.open_modal(Modal::Colorspace, window, cx)
@@ -328,21 +331,21 @@ impl Render for Plate {
             .children(self.toast.as_ref().map(|t| {
                 div()
                     .absolute()
-                    .bottom(px(92.))
-                    .left(px(0.))
-                    .right(px(0.))
+                    .bottom(s(92.))
+                    .left(s(0.))
+                    .right(s(0.))
                     .flex()
                     .justify_center()
                     .child(
                         div()
-                            .max_w(px(640.))
-                            .px(px(14.))
-                            .py(px(8.))
+                            .max_w(s(640.))
+                            .px(s(14.))
+                            .py(s(8.))
                             .bg(theme::raised())
                             .border_1()
                             .border_color(theme::hairline_strong())
-                            .rounded(px(theme::RADIUS))
-                            .text_size(px(12.))
+                            .rounded(s(theme::RADIUS))
+                            .text_size(s(12.))
                             .child(t.text.clone()),
                     )
             }))

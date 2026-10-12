@@ -39,6 +39,8 @@ pub struct Prefs {
     pub author: String,
     pub sequence_fps: f64,
     pub recent: Vec<String>,
+    /// UI scale factor, 1.0 = 100%.
+    pub ui_scale: f32,
 }
 
 impl Default for Prefs {
@@ -57,6 +59,7 @@ impl Default for Prefs {
             author: std::env::var("USER").unwrap_or_else(|_| "me".into()),
             sequence_fps: 24.0,
             recent: Vec::new(),
+            ui_scale: 1.0,
         }
     }
 }
