@@ -40,6 +40,7 @@ pub(crate) struct StreamProbe {
     pub timecode: Option<String>,
     pub transfer: Option<String>,
     pub intra_only: bool,
+    pub depth: u32,
 }
 
 pub(crate) fn probe(path: &Path) -> Result<StreamProbe> {
@@ -107,6 +108,7 @@ pub(crate) fn probe(path: &Path) -> Result<StreamProbe> {
         timecode,
         transfer,
         intra_only: is_intra_only(dec.id()),
+        depth,
     })
 }
 
@@ -166,6 +168,7 @@ impl VideoSource {
             colorspace_hint: p.transfer,
             timecode: p.timecode,
             notes_path: media::file_notes_path(path),
+            bytes_per_pixel: if p.depth > 8 { 8 } else { 4 },
         };
         Ok(Self { info, path: path.to_path_buf(), intra_only: p.intra_only })
     }
@@ -314,11 +317,11 @@ impl VideoReader {
         let mut last: Option<ff::frame::Video> = None;
         loop {
             match self.decode_next()? {
-                Some(f) => {
+                Some(mut f) => {
                     let idx = self.index_of(&f).or(self.next_index).unwrap_or(0);
                     self.next_index = Some(idx + 1);
                     if idx >= target {
-                        return self.converter.to_frame(&f);
+                        return self.converter.to_frame(&mut f);
                     }
                     last = Some(f);
                 }
@@ -327,7 +330,7 @@ impl VideoReader {
                     // hold the last decoded frame.
                     self.next_index = None;
                     return match last {
-                        Some(f) => self.converter.to_frame(&f),
+                        Some(mut f) => self.converter.to_frame(&mut f),
                         None => bail!("frame {target} is past the end of the stream"),
                     };
                 }
@@ -355,15 +358,15 @@ impl Converter {
             bail!("sws_alloc_context failed");
         }
         unsafe {
-            (*ctx).threads = 0;
-            (*ctx).flags = ffi::SwsFlags::SWS_BICUBIC as u32
-                | ffi::SwsFlags::SWS_ACCURATE_RND as u32
-                | ffi::SwsFlags::SWS_FULL_CHR_H_INT as u32;
+            // Full chroma interpolation for clean edges on 4:2:0/4:2:2;
+            // accurate rounding doubles the cost for at most one code value.
+            (*ctx).threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8) as i32;
+            (*ctx).flags = ffi::SwsFlags::SWS_BICUBIC as u32 | ffi::SwsFlags::SWS_FULL_CHR_H_INT as u32;
         }
         Ok(Self { ctx })
     }
 
-    pub fn to_frame(&mut self, src: &ff::frame::Video) -> Result<Frame> {
+    pub fn to_frame(&mut self, src: &mut ff::frame::Video) -> Result<Frame> {
         if src.format() == ff::format::Pixel::XYZ12LE || src.format() == ff::format::Pixel::XYZ12BE {
             return Ok(xyz12_to_frame(src));
         }
@@ -372,7 +375,6 @@ impl Converter {
         let out_fmt = if wide { ff::format::Pixel::RGBA64LE } else { ff::format::Pixel::RGBA };
         let (w, h) = (src.width(), src.height());
 
-        let mut src = src.clone();
         unsafe {
             let s = src.as_mut_ptr();
             // Untagged YUV: HD and up is Rec.709, SD is Rec.601, same as players do.
@@ -398,23 +400,26 @@ impl Converter {
             }
         }
 
-        let mut frame = Frame::new(w, h, alpha);
         let stride = dst.stride(0);
         let data = dst.data(0);
         let row_len = w as usize * 4;
-        frame.pixels.par_chunks_mut(row_len).enumerate().for_each(|(y, out)| {
-            let row = &data[y * stride..];
-            if wide {
+        let frame = if wide {
+            let mut frame = Frame::new(w, h, alpha);
+            frame.half_mut().par_chunks_mut(row_len).enumerate().for_each(|(y, out)| {
+                let row = &data[y * stride..];
                 for (i, o) in out.iter_mut().enumerate() {
                     let v = u16::from_le_bytes([row[i * 2], row[i * 2 + 1]]);
                     *o = f16::from_f32(v as f32 / 65535.0);
                 }
-            } else {
-                for (i, o) in out.iter_mut().enumerate() {
-                    *o = f16::from_f32(row[i] as f32 / 255.0);
-                }
-            }
-        });
+            });
+            frame
+        } else {
+            let mut frame = Frame::new_u8(w, h, alpha);
+            frame.byte_mut().par_chunks_mut(row_len).enumerate().for_each(|(y, out)| {
+                out.copy_from_slice(&data[y * stride..y * stride + row_len]);
+            });
+            frame
+        };
         Ok(frame)
     }
 }
@@ -442,7 +447,7 @@ fn xyz12_to_frame(src: &ff::frame::Video) -> Frame {
     let stride = src.stride(0);
     let data = src.data(0);
     let mut frame = Frame::new(w, h, false);
-    frame.pixels.par_chunks_mut(w as usize * 4).enumerate().for_each(|(y, out)| {
+    frame.half_mut().par_chunks_mut(w as usize * 4).enumerate().for_each(|(y, out)| {
         let row = &data[y * stride..];
         for x in 0..w as usize {
             let mut xyz = [0f32; 3];

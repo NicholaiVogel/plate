@@ -526,13 +526,17 @@ impl Plate {
 
     fn configure_loader(&self, clip: &mut Clip, clips: usize) {
         let info = &clip.info;
-        let frame_bytes = (info.width as usize * info.height as usize * 8).max(1);
-        let budget_frames = (self.cache.budget() / frame_bytes / clips.max(1)) as u64;
+        let frame_bytes = info.frame_bytes().max(1);
+        let share = self.cache.budget() / clips.max(1);
+        let budget_frames = (share / frame_bytes) as u64;
         let mut window = (budget_frames as f64 * 0.85) as u64;
-        // Long-GOP movies decode on one thread; keep four seconds ahead
-        // rather than chewing through a feature film while paused.
-        if info.kind == MediaKind::Video && clip.source.parallelism() == 1 {
-            window = window.min((info.fps * 4.0) as u64);
+        // Long-GOP movies decode on one thread. Cache the whole clip when it
+        // fits in half the budget, so scrubbing never waits on a GOP decode;
+        // otherwise stay ten seconds ahead rather than chewing through a
+        // feature film while paused.
+        let whole_clip_fits = (info.frame_count as usize).saturating_mul(frame_bytes) <= share / 2;
+        if info.kind == MediaKind::Video && clip.source.parallelism() == 1 && !whole_clip_fits {
+            window = window.min((info.fps * 10.0) as u64);
         }
         clip.loader.set_window(window.clamp(2, info.frame_count.max(2)));
         clip.loader.set_range(clip.in_point.or(clip.out_point).map(|_| clip.range()));
@@ -880,8 +884,43 @@ impl Plate {
         }
         let status = clip.loader.get(frame);
         match status {
+            // Paused or scrubbing: convert right away so the viewer tracks the
+            // mouse without waiting a repaint for a background render.
+            FrameStatus::Ready(f) if self.playback.dir == 0 => {
+                let img = to_render_image(display::render(&f, &lut, self.channel));
+                self.presenter.insert(key.clone(), img.clone());
+                self.presenter.show(slot, key, img.clone());
+                return SlotView::Image(img);
+            }
             FrameStatus::Ready(f) => self.render_async(key.clone(), f, lut.clone(), cx),
             FrameStatus::Failed(e) => return SlotView::Missing(e),
+            FrameStatus::Loading if self.playback.dir == 0 => {
+                // Scrubbing ahead of the decoder: show the nearest decoded
+                // frame now, and the exact one as soon as it lands.
+                let last = clip.info.frame_count.saturating_sub(1);
+                let near = (1..=48u64).find_map(|d| {
+                    [frame.checked_sub(d), (frame + d <= last).then_some(frame + d)]
+                        .into_iter()
+                        .flatten()
+                        .find_map(|i| match clip.loader.get(i) {
+                            FrameStatus::Ready(f) => Some((i, f)),
+                            _ => None,
+                        })
+                });
+                if let Some((i, f)) = near {
+                    let near_key = PresentKey { frame: i, ..key.clone() };
+                    let img = match self.presenter.get(&near_key) {
+                        Some(img) => img,
+                        None => {
+                            let img = to_render_image(display::render(&f, &lut, self.channel));
+                            self.presenter.insert(near_key.clone(), img.clone());
+                            img
+                        }
+                    };
+                    self.presenter.show(slot, near_key, img.clone());
+                    return SlotView::Image(img);
+                }
+            }
             FrameStatus::Loading => {}
         }
         self.prefetch_display(slot, &lut, cx);

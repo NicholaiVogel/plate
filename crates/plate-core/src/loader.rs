@@ -141,52 +141,78 @@ impl Drop for Loader {
 }
 
 /// Picks the most urgent frame that is neither cached, in flight nor failed.
+///
+/// Order: the playhead, then ahead in the play direction, then behind. A
+/// single stateful decoder (long-GOP video) gets the frames behind in
+/// ascending order after everything ahead, so it seeks once instead of once
+/// per frame; parallel sources also keep a few frames behind ready early for
+/// stepping back.
 fn next_job(shared: &Shared, s: &State) -> Option<u64> {
     let info = shared.source.info();
     let count = info.frame_count;
     if count == 0 {
         return None;
     }
-    let (lo, hi) = s.range.unwrap_or((0, count - 1));
-    let span = hi - lo + 1;
+    let sequential = shared.source.parallelism() <= 1;
     let id = info.id;
     let playhead = s.playhead.min(count - 1);
-    let step = |k: u64, dir: i32| -> Option<u64> {
-        // Wrap within the loop range when the playhead is inside it.
-        if playhead >= lo && playhead <= hi {
+    let window = s.window.min(count);
+    let dir: i64 = if s.direction < 0 { -1 } else { 1 };
+
+    // Inside a loop range, prefetch wraps around the range.
+    let (lo, hi) = s.range.unwrap_or((0, count - 1));
+    let wrapping = s.range.is_some() && playhead >= lo && playhead <= hi;
+    let (lo, hi) = if wrapping { (lo, hi) } else { (0, count - 1) };
+    let span = hi - lo + 1;
+
+    let ahead = |k: u64| -> Option<u64> {
+        if wrapping {
             let off = playhead - lo;
-            let v = if dir >= 0 { (off + k) % span } else { (off + span - (k % span)) % span };
+            let v = if dir > 0 { (off + k) % span } else { (off + span - (k % span)) % span };
             Some(lo + v)
-        } else if dir >= 0 {
-            (playhead + k < count).then_some(playhead + k)
+        } else if dir > 0 {
+            (playhead + k <= hi).then_some(playhead + k)
         } else {
-            playhead.checked_sub(k)
+            playhead.checked_sub(k).filter(|v| *v >= lo)
         }
     };
-    let window = s.window.min(count);
+    let behind = |k: u64| -> Option<u64> {
+        if wrapping {
+            return None;
+        }
+        if dir > 0 { playhead.checked_sub(k).filter(|v| *v >= lo) } else { (playhead + k <= hi).then_some(playhead + k) }
+    };
+    let n_ahead = if wrapping {
+        span.min(window)
+    } else if dir > 0 {
+        (hi - playhead + 1).min(window)
+    } else {
+        (playhead - lo + 1).min(window)
+    };
+    let n_behind = window.saturating_sub(n_ahead);
+    let early_behind = if s.direction == 0 && !sequential { 8.min(n_behind) } else { 0 };
+
     shared.cache.with_contains(|cached| {
         let free = |i: u64| !cached((id, i)) && !s.inflight.contains(&i) && !s.failed.contains_key(&i);
         if free(playhead) {
             return Some(playhead);
         }
-        let dir = if s.direction < 0 { -1 } else { 1 };
-        // While paused keep a few frames behind ready too, for stepping back.
-        let behind = if s.direction == 0 { 8.min(window) } else { 0 };
-        for k in 1..window {
-            if k <= behind {
-                if let Some(i) = step(k, -dir) {
-                    if free(i) {
-                        return Some(i);
-                    }
-                }
-            }
-            if let Some(i) = step(k, dir) {
-                if free(i) {
+        for k in 1..n_ahead.max(1) {
+            if k <= early_behind {
+                if let Some(i) = behind(k).filter(|i| free(*i)) {
                     return Some(i);
                 }
             }
+            if let Some(i) = ahead(k).filter(|i| free(*i)) {
+                return Some(i);
+            }
         }
-        None
+        if sequential {
+            // Farthest first, so one seek covers the whole stretch behind.
+            (1..=n_behind).rev().filter_map(behind).find(|i| free(*i))
+        } else {
+            (1..=n_behind).filter_map(behind).find(|i| free(*i))
+        }
     })
 }
 

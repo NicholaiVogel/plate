@@ -71,6 +71,8 @@ fn build_info(kind: MediaKind, path: &Path, name: String, frame_count: u64, firs
         colorspace_hint: (!probe.colorspace.is_empty()).then(|| probe.colorspace.clone()),
         timecode: None,
         notes_path,
+        // Only the `image` crate path keeps 8-bit data as bytes.
+        bytes_per_pixel: if probe.bits <= 8 && matches!(ext_of(path).as_str(), "png" | "jpg" | "jpeg" | "tga" | "bmp" | "webp" | "gif") { 4 } else { 8 },
     })
 }
 
@@ -160,7 +162,7 @@ fn read_exr(path: &Path) -> Result<Frame> {
 
     let (dw, dh) = (display.size.width(), display.size.height());
     let mut frame = if data_pos == display.position && data_size == display.size {
-        Frame { width: dw as u32, height: dh as u32, pixel_aspect: 1.0, has_alpha, pixels: pixels.clone() }
+        Frame { width: dw as u32, height: dh as u32, pixel_aspect: 1.0, has_alpha, pixels: crate::frame::Pixels::Half(pixels.clone()) }
     } else {
         // Data window differs from the display window (overscan or bbox crop).
         let mut f = Frame::new(dw as u32, dh as u32, has_alpha);
@@ -178,7 +180,7 @@ fn read_exr(path: &Path) -> Result<Frame> {
                 }
                 let s = (y * data_size.width() + x) * 4;
                 let d = (ty as usize * dw + tx as usize) * 4;
-                f.pixels[d..d + 4].copy_from_slice(&pixels[s..s + 4]);
+                f.half_mut()[d..d + 4].copy_from_slice(&pixels[s..s + 4]);
             }
         }
         f
@@ -190,6 +192,12 @@ fn read_exr(path: &Path) -> Result<Frame> {
 fn read_with_image(path: &Path) -> Result<Frame> {
     let img = image::open(path)?;
     let has_alpha = img.color().has_alpha();
+    if matches!(img, image::DynamicImage::ImageRgb8(_) | image::DynamicImage::ImageRgba8(_) | image::DynamicImage::ImageLuma8(_) | image::DynamicImage::ImageLumaA8(_)) {
+        let rgba = img.to_rgba8();
+        let mut f = Frame::new_u8(rgba.width(), rgba.height(), has_alpha);
+        f.byte_mut().copy_from_slice(rgba.as_raw());
+        return Ok(f);
+    }
     let rgba = img.to_rgba32f();
     Ok(Frame::from_f32(rgba.width(), rgba.height(), has_alpha, rgba.as_raw()))
 }
@@ -199,7 +207,8 @@ fn read_oiio(path: &Path) -> Result<Frame> {
     let probe = plate_native::oiio_probe(&p)?;
     let mut f = Frame::new(probe.width, probe.height, false);
     // SAFETY: f16 is a transparent wrapper over u16.
-    let bits: &mut [u16] = unsafe { std::slice::from_raw_parts_mut(f.pixels.as_mut_ptr().cast(), f.pixels.len()) };
+    let half = f.half_mut();
+    let bits: &mut [u16] = unsafe { std::slice::from_raw_parts_mut(half.as_mut_ptr().cast(), half.len()) };
     let info = plate_native::oiio_read_rgba_half(&p, bits, probe.width, probe.height)?;
     f.has_alpha = info.has_alpha;
     f.pixel_aspect = if info.pixel_aspect > 0.0 { info.pixel_aspect } else { 1.0 };

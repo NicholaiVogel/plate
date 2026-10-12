@@ -51,6 +51,8 @@ impl Shaper {
 pub struct DisplayLut {
     /// f16 bits -> lattice coordinate in [0, LUT_SIZE - 1].
     shaper: Vec<f32>,
+    /// 8-bit code value -> lattice coordinate.
+    shaper_u8: [f32; 256],
     /// RGB triples, index (r * N + g) * N + b.
     table: Vec<[f32; 3]>,
 }
@@ -80,7 +82,11 @@ impl DisplayLut {
         let shaper_table = (0..=u16::MAX)
             .map(|bits| shaper.forward(f16::from_bits(bits).to_f32()) * scale)
             .collect();
-        Ok(Self { shaper: shaper_table, table })
+        let mut shaper_u8 = [0f32; 256];
+        for (v, s) in shaper_u8.iter_mut().enumerate() {
+            *s = shaper.forward(v as f32 / 255.0) * scale;
+        }
+        Ok(Self { shaper: shaper_table, shaper_u8, table })
     }
 
     #[inline]
@@ -91,9 +97,17 @@ impl DisplayLut {
     /// Display RGB for one half-float pixel.
     #[inline]
     pub fn apply(&self, r: f16, g: f16, b: f16) -> [f32; 3] {
-        let fr = self.shaper[r.to_bits() as usize];
-        let fg = self.shaper[g.to_bits() as usize];
-        let fb = self.shaper[b.to_bits() as usize];
+        self.lookup(self.shaper[r.to_bits() as usize], self.shaper[g.to_bits() as usize], self.shaper[b.to_bits() as usize])
+    }
+
+    /// Display RGB for one 8-bit pixel.
+    #[inline]
+    pub fn apply_u8(&self, r: u8, g: u8, b: u8) -> [f32; 3] {
+        self.lookup(self.shaper_u8[r as usize], self.shaper_u8[g as usize], self.shaper_u8[b as usize])
+    }
+
+    #[inline]
+    fn lookup(&self, fr: f32, fg: f32, fb: f32) -> [f32; 3] {
         let max = (LUT_SIZE - 2) as f32;
         let (ri, gi, bi) = (fr.min(max) as usize, fg.min(max) as usize, fb.min(max) as usize);
         let (dr, dg, db) = (fr - ri as f32, fg - gi as f32, fb - bi as f32);

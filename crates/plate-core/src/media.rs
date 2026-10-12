@@ -80,9 +80,15 @@ pub struct MediaInfo {
     pub timecode: Option<String>,
     /// Sidecar file holding review notes for this media.
     pub notes_path: PathBuf,
+    /// Cached bytes per pixel: 4 for 8-bit sources, 8 for half float.
+    pub bytes_per_pixel: u32,
 }
 
 impl MediaInfo {
+    pub fn frame_bytes(&self) -> usize {
+        self.width as usize * self.height as usize * self.bytes_per_pixel as usize
+    }
+
     pub fn duration_secs(&self) -> f64 {
         self.frame_count as f64 / self.fps.max(1e-6)
     }

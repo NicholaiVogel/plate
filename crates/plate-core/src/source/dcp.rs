@@ -151,6 +151,7 @@ impl DcpSource {
             colorspace_hint: Some("dcdm".into()),
             timecode: None,
             notes_path: dir.join("plate-notes.json"),
+            bytes_per_pixel: 8,
         };
         Ok(Self { info, reels: cpl.reels })
     }
