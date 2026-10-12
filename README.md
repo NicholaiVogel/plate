@@ -88,6 +88,26 @@ progress) extends in place without losing the frame, cache or notes.
 `Ctrl +` / `Ctrl −` / `Ctrl 0` scale the whole UI (remembered across restarts).
 Press `?` in the app for every shortcut.
 
+## Command line
+
+```sh
+plate preview shot_v001.1001.exr --frame 1012     # show it in the open plate (or start one) and return
+plate preview v003.mov --compare v002.mov          # A/B
+plate info review.mp4 [--json]                     # format, range, fps, color plate would use, comments
+plate still shot_v001.1001.exr --frame 1012 -o f.png [--exposure 1] [--annotations]
+plate clip.mov                                     # GUI; hands off to an open plate if there is one
+plate clip.mov --new                               # force a separate window
+```
+
+`plate preview` is meant for scripts and agents: it never blocks. With a plate
+window open, the media is handed over a Unix socket in `$XDG_RUNTIME_DIR` and
+the window is raised; otherwise plate starts detached (log in
+`~/.local/state/plate/plate.log`). Frames are given as numbered in plate
+(1001-based for comp sequences, 0-based for movies). Errors such as a missing
+file or a frame outside the range come back on stderr with exit code 1, and
+nothing on screen changes. `plate still` renders with the same per-format
+color choice the GUI remembers.
+
 ## Build
 
 Arch packages: `ffmpeg opencolorio openimageio openexr` (plus a Rust toolchain).

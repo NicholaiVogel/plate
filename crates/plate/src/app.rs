@@ -1430,6 +1430,47 @@ impl Plate {
         cx.notify();
     }
 
+    /// Opens what the command line or another plate asked for. Errors are
+    /// returned so `plate preview` can report them.
+    pub fn apply_request(&mut self, req: crate::ipc::OpenRequest, cx: &mut Context<Self>) -> Result<(), String> {
+        for p in req.paths.iter().chain(req.compare.iter()) {
+            if !p.exists() {
+                return Err(format!("{} not found", p.display()));
+            }
+        }
+        // Check the media and the frame before touching what's on screen.
+        if let Some(p) = req.paths.first() {
+            if !p.is_dir() || scan::is_dcp_dir(p) {
+                let source = media::open(p).map_err(|e| format!("{e:#}"))?;
+                if let Some(label) = req.frame {
+                    let info = source.info();
+                    let last = info.first_frame + info.frame_count as i64 - 1;
+                    if label < info.first_frame || label > last {
+                        return Err(format!("frame {label} is outside {}-{last}", info.first_frame));
+                    }
+                }
+            }
+        }
+        if !req.paths.is_empty() {
+            self.open_paths(req.paths, cx);
+        }
+        if let Some(c) = req.compare {
+            let source = media::open(&c).map_err(|e| format!("{e:#}"))?;
+            self.set_compare(Some(source), cx);
+        }
+        if let (Some(label), Some(clip)) = (req.frame, &self.clip) {
+            let first = clip.info.first_frame;
+            let last = first + clip.info.frame_count as i64 - 1;
+            if label < first || label > last {
+                return Err(format!("frame {label} is outside {first}-{last}"));
+            }
+            self.stop();
+            self.seek((label - first) as u64);
+        }
+        cx.notify();
+        Ok(())
+    }
+
     pub fn load_captions(&mut self, path: &Path) {
         match plate_core::captions::Captions::load(path) {
             Ok(c) => {
