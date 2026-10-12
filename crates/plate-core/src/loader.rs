@@ -233,6 +233,14 @@ fn worker(shared: Arc<Shared>) {
             }
         };
 
+        let id = shared.source.info().id;
+        // A frame spilled to the disk cache is far cheaper to read back than
+        // to decode again.
+        if shared.cache.load_from_disk((id, job)).is_some() {
+            shared.state.lock().inflight.remove(&job);
+            (shared.notify)(job);
+            continue;
+        }
         if reader.is_none() {
             match shared.source.reader() {
                 Ok(r) => reader = Some(r),
@@ -247,7 +255,6 @@ fn worker(shared: Arc<Shared>) {
             }
         }
         let result = reader.as_mut().unwrap().read(job);
-        let id = shared.source.info().id;
         match result {
             Ok(frame) => {
                 shared.cache.insert((id, job), Arc::new(frame));

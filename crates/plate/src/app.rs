@@ -340,6 +340,13 @@ impl Plate {
         let viewer_focus = cx.focus_handle();
         window.focus(&viewer_focus);
 
+        // The disk cache folder belongs to this session only.
+        cx.on_app_quit(|this, _| {
+            this.cache.set_disk(None);
+            async {}
+        })
+        .detach();
+
         let mut app = Self {
             channel: Channel::Rgb,
             exposure: 0.0,
@@ -385,7 +392,23 @@ impl Plate {
         if let Some(w) = warning {
             app.show_toast(w);
         }
+        app.apply_disk_cache();
         app
+    }
+
+    /// Starts, moves or stops the disk cache to match prefs. Any previous
+    /// session folder is deleted.
+    pub fn apply_disk_cache(&mut self) {
+        self.cache.set_disk(None);
+        if !self.prefs.disk_cache {
+            return;
+        }
+        let location = self.prefs.disk_cache_location();
+        let budget = (self.prefs.disk_cache_gb as f64 * 1024.0 * 1024.0 * 1024.0) as usize;
+        match plate_core::disk::DiskTier::new(&location, budget) {
+            Ok(tier) => self.cache.set_disk(Some(tier)),
+            Err(e) => self.show_toast(format!("Disk cache unavailable at {}: {e}", location.display())),
+        }
     }
 
     // ---------------------------------------------------------------- opening

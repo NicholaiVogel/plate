@@ -9,12 +9,22 @@ use std::time::Duration;
 
 pub fn schedule(window: &mut Window, cx: &mut Context<Plate>) {
     let Ok(state) = std::env::var("PLATE_DEMO") else { return };
+    // Steps run in order; "wait:<ms>" pauses between them.
     cx.spawn_in(window, async move |this, cx| {
         cx.background_executor().timer(Duration::from_millis(1500)).await;
-        let _ = this.update_in(cx, |app, window, cx| {
-            apply(app, &state, window, cx);
-            cx.notify();
-        });
+        for step in state.split(',').map(str::to_string).collect::<Vec<_>>() {
+            if let Some(ms) = step.strip_prefix("wait:").and_then(|v| v.parse::<u64>().ok()) {
+                cx.background_executor().timer(Duration::from_millis(ms)).await;
+                continue;
+            }
+            let ok = this.update_in(cx, |app, window, cx| {
+                apply(app, &step, window, cx);
+                cx.notify();
+            });
+            if ok.is_err() {
+                break;
+            }
+        }
     })
     .detach();
 }
@@ -109,6 +119,8 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 app.timeline_bounds.get(),
                 window.bounds().size
             ),
+            "quit" => cx.quit(),
+            "wait" => {}
             "toast" => app.show_toast("Saved /tmp/frame_1012.png".into()),
             _ => log::warn!("unknown demo step {name}"),
         }

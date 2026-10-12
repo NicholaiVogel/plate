@@ -40,6 +40,25 @@ subfolders. Encrypted DCPs (KDM) are not supported.
 - Viewer exposure (stops, scene-linear) and gamma (display) are part of the
   baked transform.
 
+## Cache
+
+Decoded frames live in RAM (a quarter of physical memory by default, set in
+Settings). Short clips are cached whole, so scrubbing is instant once loaded;
+8-bit sources are cached as 8-bit.
+
+An optional disk tier (Settings → Disk cache) takes frames evicted from RAM and
+reads them back instead of decoding again, which helps with long-GOP movies,
+EXR and DCP. Point it at a fast drive. Each session gets its own folder under
+the chosen location, deleted when plate closes; folders left by a crash are
+removed on the next start. Nothing persists between sessions.
+
+## Bin
+
+Opening a file lists its folder; opening a folder lists it directly. The bin
+follows the disk live: new renders, deleted versions and copied-in files show
+up as they happen, and a sequence that grows while it's open (a render in
+progress) extends in place without losing the frame, cache or notes.
+
 ## Review
 
 - Comments panel: write a note at the current frame; it is pinned to that frame

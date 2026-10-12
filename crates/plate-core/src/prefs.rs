@@ -41,6 +41,11 @@ pub struct Prefs {
     pub recent: Vec<String>,
     /// UI scale factor, 1.0 = 100%.
     pub ui_scale: f32,
+    /// Spill frames evicted from RAM to disk.
+    pub disk_cache: bool,
+    /// Where the disk cache lives; None means the default under ~/.cache.
+    pub disk_cache_dir: Option<String>,
+    pub disk_cache_gb: f32,
 }
 
 impl Default for Prefs {
@@ -60,6 +65,9 @@ impl Default for Prefs {
             sequence_fps: 24.0,
             recent: Vec::new(),
             ui_scale: 1.0,
+            disk_cache: false,
+            disk_cache_dir: None,
+            disk_cache_gb: 64.0,
         }
     }
 }
@@ -80,6 +88,16 @@ fn default_cache_gb() -> f32 {
 
 pub fn config_dir() -> PathBuf {
     dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("plate")
+}
+
+pub fn default_disk_cache_dir() -> PathBuf {
+    dirs::cache_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("plate")
+}
+
+impl Prefs {
+    pub fn disk_cache_location(&self) -> PathBuf {
+        self.disk_cache_dir.as_ref().map(PathBuf::from).unwrap_or_else(default_disk_cache_dir)
+    }
 }
 
 pub fn data_dir() -> PathBuf {

@@ -488,6 +488,12 @@ impl Plate {
             );
         }
 
+        let disk_on = self.prefs.disk_cache;
+        let disk_location = self.prefs.disk_cache_location().to_string_lossy().to_string();
+        let disk_detail = match self.cache.disk() {
+            Some(d) => format!("{:.1} GB in use", d.used() as f64 / 1024.0 / 1024.0 / 1024.0),
+            None => "OFF".to_string(),
+        };
         let gb = self.prefs.cache_gb;
         let used = self.cache.used() as f64 / 1024.0 / 1024.0 / 1024.0;
         div()
@@ -499,7 +505,7 @@ impl Plate {
             .child(configs)
             .child(section("REMEMBERED COLOR BY FORMAT", None))
             .child(mem_list)
-            .child(section("FRAME CACHE", Some(format!("{used:.1} GB in use"))))
+            .child(section("RAM CACHE", Some(format!("{used:.1} GB in use"))))
             .child(
                 div()
                     .px(s(16.))
@@ -510,6 +516,57 @@ impl Plate {
                     .child(button("cache-dec", "−").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb - 2.0, cx))))
                     .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(16.)).child(format!("{gb:.0} GB")))
                     .child(button("cache-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb + 2.0, cx)))),
+            )
+            .child(section("DISK CACHE", Some(disk_detail)))
+            .child(
+                div()
+                    .p(s(6.))
+                    .flex()
+                    .flex_col()
+                    .child(
+                        row("disk-toggle", disk_on)
+                            .child(div().flex().flex_col().flex_1().child(div().text_size(s(13.)).child(if disk_on { "On" } else { "Off" })).child(tag("FRAMES EVICTED FROM RAM SPILL HERE · CLEARED WHEN PLATE CLOSES")))
+                            .when(disk_on, |d| d.child(icon("check").text_color(theme::blue())))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.prefs.disk_cache = !this.prefs.disk_cache;
+                                this.prefs.save();
+                                this.apply_disk_cache();
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        row("disk-location", false)
+                            .child(div().flex().flex_col().flex_1().min_w_0().child(div().text_size(s(13.)).child("Location…")).child(tag(disk_location.clone()).whitespace_nowrap().overflow_hidden().text_ellipsis()))
+                            .on_click(cx.listener(|_, _, _, cx| {
+                                let rx = cx.prompt_for_paths(PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some("Disk cache location".into()) });
+                                cx.spawn(async move |this, cx| {
+                                    if let Ok(Ok(Some(paths))) = rx.await {
+                                        if let Some(p) = paths.first() {
+                                            let p = p.to_string_lossy().to_string();
+                                            let _ = this.update(cx, |app, cx| {
+                                                app.prefs.disk_cache_dir = Some(p);
+                                                app.prefs.disk_cache = true;
+                                                app.prefs.save();
+                                                app.apply_disk_cache();
+                                                cx.notify();
+                                            });
+                                        }
+                                    }
+                                })
+                                .detach();
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .px(s(16.))
+                    .pb(s(10.))
+                    .flex()
+                    .items_center()
+                    .gap(s(8.))
+                    .child(button("disk-dec", "−").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_disk_gb(this, this.prefs.disk_cache_gb - 16.0, cx))))
+                    .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(16.)).child(format!("{:.0} GB", self.prefs.disk_cache_gb)))
+                    .child(button("disk-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_disk_gb(this, this.prefs.disk_cache_gb + 16.0, cx)))),
             )
             .child(
                 div()
@@ -584,5 +641,14 @@ fn set_cache(this: &mut Plate, gb: f32, cx: &mut Context<Plate>) {
     this.prefs.save();
     this.cache.set_budget((this.prefs.cache_gb as f64 * 1024.0 * 1024.0 * 1024.0) as usize);
     this.reconfigure_loaders();
+    cx.notify();
+}
+
+fn set_disk_gb(this: &mut Plate, gb: f32, cx: &mut Context<Plate>) {
+    this.prefs.disk_cache_gb = gb.clamp(8.0, 2048.0);
+    this.prefs.save();
+    if this.prefs.disk_cache {
+        this.apply_disk_cache();
+    }
     cx.notify();
 }
