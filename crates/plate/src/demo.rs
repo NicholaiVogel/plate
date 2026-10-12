@@ -43,6 +43,8 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                     "compare" => Modal::Compare,
                     "settings" => Modal::Settings,
                     "help" => Modal::Help,
+                    "guides" => Modal::Guides,
+                    "captions" => Modal::Captions,
                     _ => continue,
                 };
                 app.open_modal(m, window, cx);

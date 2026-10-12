@@ -253,6 +253,24 @@ impl Render for Plate {
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &ShowHelp, window, cx| this.open_modal(Modal::Help, window, cx)))
+            .on_action(cx.listener(|this, _: &ToggleGuides, window, cx| {
+                if this.prefs.guides.any() {
+                    this.prefs.guides.visible = !this.prefs.guides.visible;
+                    this.prefs.save();
+                    cx.notify();
+                } else {
+                    this.open_modal(Modal::Guides, window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ToggleCaptions, window, cx| {
+                if this.captions.is_some() {
+                    this.prefs.captions.visible = !this.prefs.captions.visible;
+                    this.prefs.save();
+                    cx.notify();
+                } else {
+                    this.open_modal(Modal::Captions, window, cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &ToggleComments, _, cx| {
                 this.prefs.show_comments = !this.prefs.show_comments;
                 this.prefs.save();

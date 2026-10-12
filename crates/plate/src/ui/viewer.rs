@@ -28,6 +28,7 @@ impl Plate {
         let compare_mode = self.compare_mode;
         let wipe = self.wipe;
         let shapes = self.visible_shapes();
+        let guides = self.prefs.guides.clone();
         let probe_pos = self.probe.as_ref().map(|p| p.pos);
         let bounds_cell = self.viewer_bounds.clone();
 
@@ -73,6 +74,9 @@ impl Plate {
                 }
 
                 window.with_content_mask(Some(ContentMask { bounds }), |window| {
+                    if guides.visible && guides.any() {
+                        paint_guides(window, &guides, rect_a, a.width as f32 * a.aspect / a.height.max(1) as f32);
+                    }
                     for (shape, strong) in &shapes {
                         paint_shape(window, shape, rect_a, *strong);
                     }
@@ -273,6 +277,60 @@ impl Plate {
                         .child(text),
                 );
             }
+        }
+
+        // Aspect label and captions sit inside the guide frame.
+        let image_aspect = clip.info.width as f32 * clip.info.pixel_aspect / clip.info.height.max(1) as f32;
+        let guides = &self.prefs.guides;
+        let frame = guide_frame(rect, image_aspect, if guides.visible { guides.aspect } else { None });
+        let local = |b: Bounds<Pixels>| Bounds { origin: point(b.origin.x - origin.x, b.origin.y - origin.y), size: b.size };
+        if guides.visible {
+            if let Some(a) = guides.aspect {
+                let f = local(frame);
+                layer = layer.child(
+                    div()
+                        .absolute()
+                        .left(f.origin.x + s(6.))
+                        .top(f.origin.y + s(4.))
+                        .child(tag(format!("{}", aspect_label(a))).text_color(theme::ink_muted())),
+                );
+            }
+        }
+        let lines = self.caption_lines();
+        if !lines.is_empty() {
+            let style = self.prefs.captions.clone();
+            let f = local(frame);
+            let h = f32::from(f.size.height);
+            let font = (h * style.size).max(10.0);
+            let margin = px(h * 0.07);
+            let mut block = div()
+                .absolute()
+                .left(f.origin.x)
+                .top(f.origin.y)
+                .w(f.size.width)
+                .h(f.size.height)
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(font * 0.12))
+                .when(style.top, |d| d.justify_start().pt(margin))
+                .when(!style.top, |d| d.justify_end().pb(margin));
+            for line in lines {
+                block = block.child(
+                    div()
+                        .px(px(font * 0.35))
+                        .py(px(font * 0.08))
+                        .rounded(px(font * 0.12))
+                        .when(style.boxed, |d| d.bg(gpui::rgba(0x000000c0)))
+                        .text_size(px(font))
+                        .line_height(px(font * 1.25))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_color(theme::ink())
+                        .whitespace_nowrap()
+                        .child(line),
+                );
+            }
+            layer = layer.child(block);
         }
 
         // The name lives in the top bar; the viewer only reports status.
@@ -613,5 +671,102 @@ fn paint_shape(window: &mut Window, shape: &Shape, rect: Bounds<Pixels>, strong:
     let _ = &mut builder;
     if let Ok(path) = builder.build() {
         window.paint_path(path, color);
+    }
+}
+
+/// The area guides are measured in: the image, or the centered extraction of
+/// the masked aspect ratio inside it.
+pub(crate) fn guide_frame(rect: Bounds<Pixels>, image_aspect: f32, aspect: Option<f32>) -> Bounds<Pixels> {
+    let Some(target) = aspect.filter(|a| *a > 0.0) else { return rect };
+    let (w, h) = (f32::from(rect.size.width), f32::from(rect.size.height));
+    let (fw, fh) = if target >= image_aspect { (w, w / target) } else { (h * target, h) };
+    Bounds::centered_at(rect.center(), gpui::size(px(fw), px(fh)))
+}
+
+pub(crate) fn aspect_label(a: f32) -> String {
+    match a {
+        a if (a - 0.8).abs() < 1e-3 => "4:5".into(),
+        a if (a - 0.5625).abs() < 1e-3 => "9:16".into(),
+        a if (a - 1.3333).abs() < 1e-3 => "4:3".into(),
+        a if (a - 1.7778).abs() < 1e-3 => "16:9".into(),
+        a => format!("{a:.2}:1"),
+    }
+}
+
+fn paint_guides(window: &mut Window, g: &plate_core::prefs::Guides, rect: Bounds<Pixels>, image_aspect: f32) {
+    let frame = guide_frame(rect, image_aspect, g.aspect);
+    let line = Hsla::from(theme::ink()).alpha(0.45);
+    let faint = Hsla::from(theme::ink()).alpha(0.28);
+
+    if g.aspect.is_some() {
+        let shade = gpui::black().alpha(g.mask_opacity);
+        // The bars outside the extraction, then a hairline at its edge.
+        for bar in [
+            Bounds::from_corners(rect.origin, point(rect.right(), frame.top())),
+            Bounds::from_corners(point(rect.left(), frame.bottom()), rect.bottom_right()),
+            Bounds::from_corners(point(rect.left(), frame.top()), point(frame.left(), frame.bottom())),
+            Bounds::from_corners(point(frame.right(), frame.top()), point(rect.right(), frame.bottom())),
+        ] {
+            if bar.size.width > px(0.) && bar.size.height > px(0.) {
+                window.paint_quad(fill(bar, shade));
+            }
+        }
+        outline(window, frame, line, false);
+    }
+
+    let at = |fx: f32, fy: f32| point(frame.origin.x + frame.size.width * fx, frame.origin.y + frame.size.height * fy);
+    let mut segments: Vec<(Point<Pixels>, Point<Pixels>, Hsla)> = Vec::new();
+    if let Some((cols, rows)) = g.grid {
+        for c in 1..cols {
+            let x = c as f32 / cols as f32;
+            segments.push((at(x, 0.0), at(x, 1.0), faint));
+        }
+        for r in 1..rows {
+            let y = r as f32 / rows as f32;
+            segments.push((at(0.0, y), at(1.0, y), faint));
+        }
+    }
+    if g.thirds {
+        for t in [1.0 / 3.0, 2.0 / 3.0] {
+            segments.push((at(t, 0.0), at(t, 1.0), line));
+            segments.push((at(0.0, t), at(1.0, t), line));
+        }
+    }
+    if g.center {
+        let arm = frame.size.height * 0.03;
+        let c = frame.center();
+        segments.push((point(c.x - arm, c.y), point(c.x + arm, c.y), line));
+        segments.push((point(c.x, c.y - arm), point(c.x, c.y + arm), line));
+    }
+    for (a, b, color) in segments {
+        let mut pb = PathBuilder::stroke(px(1.));
+        pb.move_to(a);
+        pb.line_to(b);
+        if let Ok(p) = pb.build() {
+            window.paint_path(p, color);
+        }
+    }
+    // Action safe 93%, title safe 90% (SMPTE ST 2046-1 / EBU R95 style).
+    let inset = |pct: f32| {
+        let dx = frame.size.width * ((1.0 - pct) / 2.0);
+        let dy = frame.size.height * ((1.0 - pct) / 2.0);
+        Bounds::from_corners(point(frame.left() + dx, frame.top() + dy), point(frame.right() - dx, frame.bottom() - dy))
+    };
+    if g.action_safe {
+        outline(window, inset(0.93), line, false);
+    }
+    if g.title_safe {
+        outline(window, inset(0.90), line, true);
+    }
+}
+
+fn outline(window: &mut Window, b: Bounds<Pixels>, color: Hsla, dashed: bool) {
+    let mut pb = PathBuilder::stroke(px(1.));
+    if dashed {
+        pb = pb.dash_array(&[px(6.), px(4.)]);
+    }
+    pb.add_polygon(&[b.origin, point(b.right(), b.top()), b.bottom_right(), point(b.left(), b.bottom())], true);
+    if let Ok(p) = pb.build() {
+        window.paint_path(p, color);
     }
 }

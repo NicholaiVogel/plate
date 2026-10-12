@@ -22,6 +22,61 @@ pub struct ColorChoice {
     pub view: String,
 }
 
+/// Framing overlays drawn over the image. Thirds, safe areas and grids are
+/// measured inside the aspect mask when one is set.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Guides {
+    /// Master switch (the `'` key); the individual choices are kept.
+    pub visible: bool,
+    pub thirds: bool,
+    pub center: bool,
+    pub action_safe: bool,
+    pub title_safe: bool,
+    /// Width / height of the extraction to mask to, e.g. 2.39.
+    pub aspect: Option<f32>,
+    pub mask_opacity: f32,
+    /// Columns × rows.
+    pub grid: Option<(u32, u32)>,
+}
+
+impl Default for Guides {
+    fn default() -> Self {
+        Self {
+            visible: true,
+            thirds: false,
+            center: false,
+            action_safe: false,
+            title_safe: false,
+            aspect: None,
+            mask_opacity: 0.75,
+            grid: None,
+        }
+    }
+}
+
+impl Guides {
+    pub fn any(&self) -> bool {
+        self.thirds || self.center || self.action_safe || self.title_safe || self.aspect.is_some() || self.grid.is_some()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CaptionStyle {
+    pub visible: bool,
+    /// Text height as a fraction of the frame height.
+    pub size: f32,
+    pub boxed: bool,
+    pub top: bool,
+}
+
+impl Default for CaptionStyle {
+    fn default() -> Self {
+        Self { visible: true, size: 0.045, boxed: true, top: false }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Prefs {
@@ -46,6 +101,8 @@ pub struct Prefs {
     /// Where the disk cache lives; None means the default under ~/.cache.
     pub disk_cache_dir: Option<String>,
     pub disk_cache_gb: f32,
+    pub guides: Guides,
+    pub captions: CaptionStyle,
 }
 
 impl Default for Prefs {
@@ -68,6 +125,8 @@ impl Default for Prefs {
             disk_cache: false,
             disk_cache_dir: None,
             disk_cache_gb: 64.0,
+            guides: Guides::default(),
+            captions: CaptionStyle::default(),
         }
     }
 }

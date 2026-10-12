@@ -90,8 +90,7 @@ pub fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
         .hover(|s| s.bg(theme::hover()))
 }
 
-/// Plain text button with a hairline border.
-pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
+fn button_base(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
     div()
         .id(id)
         .h(s(28.))
@@ -100,16 +99,25 @@ pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> State
         .items_center()
         .justify_center()
         .border_1()
-        .border_color(theme::hairline_strong())
         .rounded(s(theme::RADIUS))
         .text_size(s(12.))
         .cursor_pointer()
-        .hover(|s| s.bg(theme::hover()).border_color(theme::ink_muted()))
         .child(label.into())
 }
 
+/// Plain text button with a hairline border.
+pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
+    button_base(id, label)
+        .border_color(theme::hairline_strong())
+        .hover(|s| s.bg(theme::hover()).border_color(theme::ink_muted()))
+}
+
 pub fn primary_button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
-    button(id, label).bg(theme::blue()).border_color(theme::blue()).text_color(theme::paper()).hover(|s| s.bg(theme::ink()))
+    button_base(id, label)
+        .bg(theme::blue())
+        .border_color(theme::blue())
+        .text_color(theme::paper())
+        .hover(|s| s.bg(theme::ink()))
 }
 
 struct Tip(SharedString);

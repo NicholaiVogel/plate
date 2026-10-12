@@ -17,6 +17,8 @@ impl Plate {
             Modal::Compare => ("Compare A/B", 480., self.modal_compare(cx).into_any_element()),
             Modal::Settings => ("Settings", 560., self.modal_settings(cx).into_any_element()),
             Modal::Help => ("Shortcuts", 720., self.modal_help().into_any_element()),
+            Modal::Guides => ("Guides", 520., self.modal_guides(cx).into_any_element()),
+            Modal::Captions => ("Captions", 480., self.modal_captions(cx).into_any_element()),
             Modal::TextAnnotation => ("Text annotation", 420., self.modal_text().into_any_element()),
         };
         div()
@@ -537,6 +539,248 @@ impl Plate {
                     .child(self.annotation_input.clone()),
             )
             .child(tag("ENTER PLACES IT  ·  ESC CANCELS"))
+    }
+}
+
+/// A row that toggles one setting, with a check when on.
+fn toggle_row(id: impl Into<gpui::ElementId>, label: &str, detail: &str, on: bool) -> gpui::Stateful<Div> {
+    row(id, false)
+        .child(
+            div()
+                .size(s(16.))
+                .flex()
+                .flex_none()
+                .items_center()
+                .justify_center()
+                .rounded(s(3.))
+                .border_1()
+                .border_color(if on { theme::blue() } else { theme::hairline_strong() })
+                .when(on, |d| d.bg(theme::blue()))
+                .when(on, |d| d.child(super::widgets::icon_sized("check", 12.).text_color(theme::paper()))),
+        )
+        .child(div().flex_1().text_size(s(13.)).child(label.to_string()))
+        .child(tag(detail.to_string()))
+}
+
+/// A row of mutually exclusive choices.
+fn choices<T: Clone + PartialEq + 'static>(
+    id: &'static str,
+    options: Vec<(String, T)>,
+    current: &T,
+    cx: &mut Context<Plate>,
+    apply: impl Fn(&mut Plate, T) + Clone + 'static,
+) -> Div {
+    let mut row = div().flex().flex_wrap().gap(s(4.));
+    for (i, (label, value)) in options.into_iter().enumerate() {
+        let selected = &value == current;
+        let apply = apply.clone();
+        row = row.child(mode_button_owned(SharedString::from(format!("{id}-{i}")), label, selected).on_click(cx.listener(move |this, _, _, cx| {
+            apply(this, value.clone());
+            this.prefs.save();
+            cx.notify();
+        })));
+    }
+    row
+}
+
+fn mode_button_owned(id: SharedString, label: String, selected: bool) -> gpui::Stateful<Div> {
+    button(id, label).when(selected, |d| d.bg(theme::structure()).border_color(theme::blue()))
+}
+
+impl Plate {
+    fn modal_guides(&mut self, cx: &mut Context<Self>) -> Div {
+        let g = self.prefs.guides.clone();
+        let toggle = |id: &'static str, label: &str, detail: &str, on: bool, cx: &mut Context<Plate>, f: fn(&mut plate_core::prefs::Guides)| {
+            toggle_row(id, label, detail, on).on_click(cx.listener(move |this, _, _, cx| {
+                f(&mut this.prefs.guides);
+                this.prefs.guides.visible = true;
+                this.prefs.save();
+                cx.notify();
+            }))
+        };
+        let aspects: Vec<(String, Option<f32>)> = vec![
+            ("Off".into(), None),
+            ("2.39".into(), Some(2.39)),
+            ("2.35".into(), Some(2.35)),
+            ("2.00".into(), Some(2.0)),
+            ("1.85".into(), Some(1.85)),
+            ("16:9".into(), Some(16.0 / 9.0)),
+            ("4:3".into(), Some(4.0 / 3.0)),
+            ("1:1".into(), Some(1.0)),
+            ("4:5".into(), Some(0.8)),
+            ("9:16".into(), Some(9.0 / 16.0)),
+        ];
+        let grids: Vec<(String, Option<(u32, u32)>)> = vec![
+            ("Off".into(), None),
+            ("2×2".into(), Some((2, 2))),
+            ("4×4".into(), Some((4, 4))),
+            ("6×4".into(), Some((6, 4))),
+            ("8×8".into(), Some((8, 8))),
+            ("12×12".into(), Some((12, 12))),
+        ];
+        let opacities: Vec<(String, u32)> = vec![("50%".into(), 50), ("75%".into(), 75), ("100%".into(), 100)];
+        let current_opacity = (g.mask_opacity * 100.0).round() as u32;
+        div()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .p(s(6.))
+                    .flex()
+                    .flex_col()
+                    .child(toggle_row("g-visible", "Show guides", "'", g.visible).on_click(cx.listener(|this, _, _, cx| {
+                        this.prefs.guides.visible = !this.prefs.guides.visible;
+                        this.prefs.save();
+                        cx.notify();
+                    })))
+                    .child(toggle("g-thirds", "Rule of thirds", "", g.thirds, cx, |g| g.thirds = !g.thirds))
+                    .child(toggle("g-center", "Center cross", "", g.center, cx, |g| g.center = !g.center))
+                    .child(toggle("g-action", "Action safe", "93%", g.action_safe, cx, |g| g.action_safe = !g.action_safe))
+                    .child(toggle("g-title", "Title safe", "90% · DASHED", g.title_safe, cx, |g| g.title_safe = !g.title_safe)),
+            )
+            .child(section("ASPECT MASK", Some("GUIDES SIT INSIDE IT".into())))
+            .child(div().px(s(16.)).py(s(8.)).child(choices("g-aspect", aspects, &g.aspect, cx, |p, v| {
+                p.prefs.guides.aspect = v;
+                p.prefs.guides.visible = true;
+            })))
+            .child(
+                div()
+                    .px(s(16.))
+                    .pb(s(10.))
+                    .flex()
+                    .items_center()
+                    .gap(s(10.))
+                    .child(tag("MASK"))
+                    .child(choices("g-opacity", opacities, &current_opacity, cx, |p, v| p.prefs.guides.mask_opacity = v as f32 / 100.0)),
+            )
+            .child(section("GRID", Some("COLUMNS × ROWS".into())))
+            .child(div().px(s(16.)).py(s(8.)).pb(s(14.)).child(choices("g-grid", grids, &g.grid, cx, |p, v| {
+                p.prefs.guides.grid = v;
+                p.prefs.guides.visible = true;
+            })))
+    }
+
+    fn modal_captions(&mut self, cx: &mut Context<Self>) -> Div {
+        let style = self.prefs.captions.clone();
+        let current = self.captions.as_ref().map(|c| (c.path.clone(), c.cues.len()));
+        let sidecars = self
+            .clip
+            .as_ref()
+            .map(|c| plate_core::captions::find_sidecars(&c.info.path, None))
+            .unwrap_or_default();
+        let fps = self.fps();
+        let offset = self.caption_offset;
+
+        let mut files = div().p(s(6.)).flex().flex_col();
+        match &current {
+            Some((path, n)) => {
+                files = files.child(
+                    row("cap-current", true)
+                        .child(div().flex().flex_col().flex_1().min_w_0().child(div().text_size(s(13.)).child(path.file_name().unwrap_or_default().to_string_lossy().to_string())).child(tag(format!("{n} CUES"))))
+                        .child(icon_button("cap-clear", "x", false).size(s(24.)).on_click(cx.listener(|this, _, _, cx| {
+                            this.captions = None;
+                            cx.notify();
+                        }))),
+                );
+            }
+            None => {
+                files = files.child(div().px(s(10.)).py(s(6.)).text_size(s(12.)).text_color(theme::ink_faint()).child("No captions loaded. A clip.srt or clip.vtt next to the media loads automatically."));
+            }
+        }
+        for (i, p) in sidecars.into_iter().enumerate() {
+            if current.as_ref().is_some_and(|(c, _)| *c == p) {
+                continue;
+            }
+            let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            files = files.child(row(("cap-side", i), false).child(div().text_size(s(13.)).child(name)).on_click(cx.listener(move |this, _, _, cx| {
+                this.load_captions(&p);
+                cx.notify();
+            })));
+        }
+
+        div()
+            .flex()
+            .flex_col()
+            .child(files)
+            .child(
+                div()
+                    .px(s(16.))
+                    .pb(s(10.))
+                    .flex()
+                    .gap(s(8.))
+                    .child(primary_button("cap-load", "Load file…").on_click(cx.listener(|_, _, _, cx| {
+                        let rx = cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: false, prompt: Some("Captions (SRT or VTT)".into()) });
+                        cx.spawn(async move |this, cx| {
+                            if let Ok(Ok(Some(paths))) = rx.await {
+                                if let Some(p) = paths.first().cloned() {
+                                    let _ = this.update(cx, |app, cx| {
+                                        app.load_captions(&p);
+                                        cx.notify();
+                                    });
+                                }
+                            }
+                        })
+                        .detach();
+                    })))
+                    .child(button("cap-toggle", if style.visible { "Hide  (S)" } else { "Show  (S)" }).on_click(cx.listener(|this, _, _, cx| {
+                        this.prefs.captions.visible = !this.prefs.captions.visible;
+                        this.prefs.save();
+                        cx.notify();
+                    }))),
+            )
+            .child(section("STYLE", None))
+            .child(
+                div()
+                    .px(s(16.))
+                    .py(s(10.))
+                    .flex()
+                    .flex_col()
+                    .gap(s(10.))
+                    .child(div().flex().items_center().gap(s(10.)).child(div().w(s(70.)).child(tag("SIZE"))).child(choices(
+                        "cap-size",
+                        vec![("S".into(), 35u32), ("M".into(), 45), ("L".into(), 60)],
+                        &((style.size * 1000.0).round() as u32),
+                        cx,
+                        |p, v| p.prefs.captions.size = v as f32 / 1000.0,
+                    )))
+                    .child(div().flex().items_center().gap(s(10.)).child(div().w(s(70.)).child(tag("POSITION"))).child(choices(
+                        "cap-pos",
+                        vec![("Bottom".into(), false), ("Top".into(), true)],
+                        &style.top,
+                        cx,
+                        |p, v| p.prefs.captions.top = v,
+                    )))
+                    .child(div().flex().items_center().gap(s(10.)).child(div().w(s(70.)).child(tag("BOX"))).child(choices(
+                        "cap-box",
+                        vec![("On".into(), true), ("Off".into(), false)],
+                        &style.boxed,
+                        cx,
+                        |p, v| p.prefs.captions.boxed = v,
+                    ))),
+            )
+            .child(section("SYNC", Some(format!("{:+.3} S", offset as f64 / fps))))
+            .child(
+                div()
+                    .px(s(16.))
+                    .py(s(10.))
+                    .pb(s(14.))
+                    .flex()
+                    .items_center()
+                    .gap(s(8.))
+                    .child(button("cap-off-dec", "−").w(s(36.)).on_click(cx.listener(|this, _, _, cx| {
+                        this.caption_offset -= 1;
+                        cx.notify();
+                    })))
+                    .child(div().w(s(110.)).flex().justify_center().font_family(FONT_MONO).text_size(s(14.)).child(format!("{offset:+} frames")))
+                    .child(button("cap-off-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| {
+                        this.caption_offset += 1;
+                        cx.notify();
+                    })))
+                    .child(button("cap-off-zero", "Reset").on_click(cx.listener(|this, _, _, cx| {
+                        this.caption_offset = 0;
+                        cx.notify();
+                    }))),
+            )
     }
 }
 

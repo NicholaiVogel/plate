@@ -60,6 +60,18 @@ follows the disk live: new renders, deleted versions and copied-in files show
 up as they happen, and a sequence that grows while it's open (a render in
 progress) extends in place without losing the frame, cache or notes.
 
+## Guides and captions
+
+- Guides (grid button, `'` to show/hide): rule of thirds, center cross, action
+  safe (93%) and title safe (90%), an aspect mask (2.39, 2.35, 2.00, 1.85,
+  16:9, 4:3, 1:1, 4:5, 9:16) at 50/75/100%, and grids up to 12×12. Everything
+  is measured inside the mask, so thirds and safe areas follow the extraction.
+  Remembered between sessions.
+- Captions (CC button, `S` to show/hide): SRT and WebVTT. A sidecar named like
+  the clip (`clip.srt`, `clip.en.vtt`, `shot_v001.srt` for a sequence) loads
+  automatically; others can be loaded by hand. Size, position and background
+  box are adjustable, plus a frame offset for files that don't start at zero.
+
 ## Review
 
 - Comments panel: write a note at the current frame; it is pinned to that frame

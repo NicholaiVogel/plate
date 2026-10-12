@@ -112,6 +112,8 @@ pub enum Modal {
     Settings,
     Help,
     TextAnnotation,
+    Guides,
+    Captions,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -300,6 +302,9 @@ pub struct Plate {
     pub annotation_input: Entity<TextInput>,
     pub toast: Option<Toast>,
 
+    pub captions: Option<plate_core::captions::Captions>,
+    /// Frames to shift captions by, for files that don't start at frame 0.
+    pub caption_offset: i64,
     pub presenter: Presenter,
     /// Viewer and timeline geometry from the last paint, for mouse mapping.
     pub viewer_bounds: Rc<Cell<Bounds<Pixels>>>,
@@ -389,6 +394,8 @@ impl Plate {
             search_input,
             annotation_input,
             toast: None,
+            captions: None,
+            caption_offset: 0,
             presenter: Presenter::default(),
             viewer_bounds: Rc::new(Cell::new(Bounds::default())),
             window_title: String::new(),
@@ -620,6 +627,8 @@ impl Plate {
         self.focused_comment = None;
         self.probe = None;
         clip.loader.set_playhead(0, 0);
+        self.captions = find_captions(&clip.info);
+        self.caption_offset = 0;
         self.clip = Some(clip);
         self.reconfigure_loaders();
         cx.notify();
@@ -1421,6 +1430,27 @@ impl Plate {
         cx.notify();
     }
 
+    pub fn load_captions(&mut self, path: &Path) {
+        match plate_core::captions::Captions::load(path) {
+            Ok(c) => {
+                self.show_toast(format!("{} captions from {}", c.cues.len(), path.file_name().unwrap_or_default().to_string_lossy()));
+                self.captions = Some(c);
+                self.prefs.captions.visible = true;
+            }
+            Err(e) => self.show_toast(format!("Couldn't read captions: {e:#}")),
+        }
+    }
+
+    /// Cue lines showing on the current frame.
+    pub fn caption_lines(&self) -> Vec<String> {
+        let Some(c) = &self.captions else { return Vec::new() };
+        if !self.prefs.captions.visible {
+            return Vec::new();
+        }
+        let secs = (self.frame as i64 + self.caption_offset) as f64 / self.fps();
+        c.at(secs).into_iter().flat_map(|cue| cue.lines.iter().cloned()).collect()
+    }
+
     pub fn show_toast(&mut self, text: String) {
         log::info!("{text}");
         self.toast = Some(Toast { text, until: Instant::now() + Duration::from_secs(4) });
@@ -1595,6 +1625,23 @@ fn watch_dir(dir: &Path, cx: &mut Context<Plate>) -> Option<notify::RecommendedW
     })
     .detach();
     Some(watcher)
+}
+
+/// Picks up `clip.srt` / `clip.vtt` (or a language variant) next to the media.
+fn find_captions(info: &MediaInfo) -> Option<plate_core::captions::Captions> {
+    let stem = match info.kind {
+        MediaKind::Sequence => Some(info.name.split(['#', '[']).next().unwrap_or("").trim_end_matches(['.', '_', '-', ' ']).to_string()),
+        MediaKind::Dcp => info.path.file_name().map(|n| n.to_string_lossy().to_string()),
+        _ => None,
+    };
+    let path = plate_core::captions::find_sidecars(&info.path, stem.as_deref()).into_iter().next()?;
+    match plate_core::captions::Captions::load(&path) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            log::warn!("{}: {e:#}", path.display());
+            None
+        }
+    }
 }
 
 pub fn dir_title(dir: &Path) -> String {

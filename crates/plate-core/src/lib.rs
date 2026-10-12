@@ -4,6 +4,7 @@
 pub mod audio;
 pub mod bake;
 pub mod cache;
+pub mod captions;
 pub mod color;
 pub mod disk;
 pub mod display;

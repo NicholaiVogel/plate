@@ -22,6 +22,8 @@ ff -f lavfi -i testsrc2=size=2048x1152:rate=24 -t 2 -vf format=gbrp10le \
    -c:v dpx -start_number 1001 dpx10/plate.%04d.dpx
 ff -f lavfi -i testsrc2=size=1280x720:rate=24 -t 1 -vf format=rgb48be -start_number 1 png16/img_%03d.png
 
+printf '1\n00:00:00,500 --> 00:00:03,000\nThe roto edge holds up on the left now.\n<i>Second line of the cue.</i>\n\n2\n00:00:03,200 --> 00:00:04,800\nAnd this one closes it out.\n' > clip_h264.srt
+
 if command -v oiiotool >/dev/null; then
   for f in exr_half/*.exr; do
     oiiotool "$f" --compression dwaa -o "exr_dwaa/$(basename "$f")"

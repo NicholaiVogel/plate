@@ -317,6 +317,16 @@ impl Plate {
                                 cx.notify();
                             }))
                     }))
+                    .child(
+                        icon_button("guides", "grid", self.prefs.guides.visible && self.prefs.guides.any())
+                            .tip("Guides  (' toggles)")
+                            .on_click(cx.listener(|this, _, window, cx| this.open_modal(crate::app::Modal::Guides, window, cx))),
+                    )
+                    .child(
+                        icon_button("captions", "captions", self.captions.is_some() && self.prefs.captions.visible)
+                            .tip("Captions  (S toggles)")
+                            .on_click(cx.listener(|this, _, window, cx| this.open_modal(crate::app::Modal::Captions, window, cx))),
+                    )
                     .child(icon_button("draw", "pencil", self.drawing).tip("Annotate  (D)").on_click(cx.listener(|this, _, window, cx| {
                         this.drawing = !this.drawing;
                         if this.drawing {
