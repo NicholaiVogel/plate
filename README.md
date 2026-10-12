@@ -77,7 +77,7 @@ scripts/install.sh                 # ~/.local/bin/plate, desktop entry, icon
 scripts/install.sh --set-default   # also the default for video, EXR, DPX, MXF
 ```
 
-Folders keep their default handler; plate appears under "Open With" for them.
+Folders keep their default handler (drop a folder on the window or use `Ctrl Shift O` to open it as a bin).
 
 ## Layout
 

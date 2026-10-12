@@ -3,9 +3,7 @@
 #   ~/.local/bin/plate, a desktop entry and an icon.
 #
 # Usage: scripts/install.sh [--set-default]
-#   --set-default  also make plate the default app for video, EXR, DPX and MXF
-#                  (folders keep their current default; plate only appears in
-#                  "Open With" for them).
+#   --set-default  also make plate the default app for video, EXR, DPX and MXF.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
