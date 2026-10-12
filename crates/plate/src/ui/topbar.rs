@@ -1,5 +1,5 @@
 use super::widgets::{chip, icon_button, segmented, tag};
-use crate::app::{CompareMode, Modal, Plate};
+use crate::app::{CompareMode, Modal, Plate, SliderKind};
 use crate::theme::{self, s, FONT_MONO};
 use gpui::{div, prelude::*, Context, FontWeight, Window};
 use plate_core::display::Channel;
@@ -23,11 +23,6 @@ impl Plate {
         let mut controls = div().flex().flex_none().items_center().gap(s(6.));
         if let Some(c) = clip {
             let view = format!("{} · {}", short_display(&c.choice.display), c.choice.view);
-            let exposure = if self.exposure == 0.0 && (self.gamma - 1.0).abs() < 1e-4 {
-                "0.0".to_string()
-            } else {
-                format!("{:+.2}  γ{:.2}", self.exposure, self.gamma)
-            };
             let compare = match (&self.compare, self.compare_mode) {
                 (None, _) => "Off".to_string(),
                 (Some(_), CompareMode::Wipe) => "Wipe".to_string(),
@@ -47,10 +42,8 @@ impl Plate {
                     chip("chip-channel", "Ch", self.channel.label(), self.channel != Channel::Rgb || self.modal == Some(Modal::Channel))
                         .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Channel, window, cx))),
                 )
-                .child(
-                    chip("chip-exposure", "Exp", exposure, self.exposure != 0.0 || (self.gamma - 1.0).abs() > 1e-4 || self.modal == Some(Modal::Exposure))
-                        .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Exposure, window, cx))),
-                )
+                .child(self.render_slider(SliderKind::Exposure, cx))
+                .child(self.render_slider(SliderKind::Gamma, cx))
                 .child(
                     chip("chip-compare", "A/B", compare, self.compare.is_some() || self.modal == Some(Modal::Compare))
                         .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Compare, window, cx))),

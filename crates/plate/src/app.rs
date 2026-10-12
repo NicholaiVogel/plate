@@ -108,7 +108,6 @@ pub enum Modal {
     Colorspace,
     Display,
     Channel,
-    Exposure,
     Compare,
     Settings,
     Help,
@@ -232,8 +231,15 @@ pub enum Drag {
     Draw,
     Wipe,
     Scrub,
+    Slider(SliderKind),
     /// A left click on the image that may turn into a pan.
     Click { start: Point<Pixels>, pan: Point<Pixels> },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SliderKind {
+    Exposure = 0,
+    Gamma = 1,
 }
 
 pub struct Probe {
@@ -301,6 +307,7 @@ pub struct Plate {
     bin_watcher: Option<notify::RecommendedWatcher>,
     pub window_title: String,
     pub timeline_bounds: Rc<Cell<Bounds<Pixels>>>,
+    pub slider_bounds: [Rc<Cell<Bounds<Pixels>>>; 2],
     frame_ready_tx: futures::channel::mpsc::UnboundedSender<()>,
 }
 
@@ -387,6 +394,7 @@ impl Plate {
             bin_watcher: None,
             stats: std::env::var("PLATE_STATS").is_ok().then(|| (Instant::now(), 0, u64::MAX)),
             timeline_bounds: Rc::new(Cell::new(Bounds::default())),
+            slider_bounds: [Rc::new(Cell::new(Bounds::default())), Rc::new(Cell::new(Bounds::default()))],
             frame_ready_tx: tx,
         };
         if let Some(w) = warning {
@@ -963,9 +971,16 @@ impl Plate {
         self.channel = if self.channel == ch && ch != Channel::Rgb { Channel::Rgb } else { ch };
     }
 
+    /// Exposure in stops, on a 1/20-stop grid so dragging reuses baked LUTs.
     pub fn set_exposure(&mut self, stops: f32) {
-        self.exposure = (stops * 4.0).round() / 4.0;
-        self.exposure = self.exposure.clamp(-12.0, 12.0);
+        self.exposure = ((stops * 20.0).round() / 20.0).clamp(-8.0, 8.0);
+        if self.exposure == -0.0 {
+            self.exposure = 0.0;
+        }
+    }
+
+    pub fn set_gamma(&mut self, gamma: f32) {
+        self.gamma = ((gamma * 100.0).round() / 100.0).clamp(0.2, 5.0);
     }
 
     // ---------------------------------------------------------------- display

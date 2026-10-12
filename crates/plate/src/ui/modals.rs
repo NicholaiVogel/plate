@@ -14,7 +14,6 @@ impl Plate {
             Modal::Colorspace => ("Input colorspace", 520., self.modal_colorspace(window, cx).into_any_element()),
             Modal::Display => ("Display & view", 560., self.modal_display(cx).into_any_element()),
             Modal::Channel => ("Channels", 340., self.modal_channel(cx).into_any_element()),
-            Modal::Exposure => ("Exposure & gamma", 420., self.modal_exposure(cx).into_any_element()),
             Modal::Compare => ("Compare A/B", 480., self.modal_compare(cx).into_any_element()),
             Modal::Settings => ("Settings", 560., self.modal_settings(cx).into_any_element()),
             Modal::Help => ("Shortcuts", 720., self.modal_help().into_any_element()),
@@ -245,84 +244,6 @@ impl Plate {
             );
         }
         list
-    }
-
-    fn modal_exposure(&mut self, cx: &mut Context<Self>) -> Div {
-        let stepper = |id: &'static str, label: &str, value: String, dec: Box<dyn Fn(&mut Plate)>, inc: Box<dyn Fn(&mut Plate)>, presets: Vec<(String, Box<dyn Fn(&mut Plate)>)>, cx: &mut Context<Plate>| {
-            let mut presets_row = div().flex().gap(s(4.));
-            for (i, (label, f)) in presets.into_iter().enumerate() {
-                presets_row = presets_row.child(
-                    button(SharedString::from(format!("{id}-p{i}")), label).font_family(FONT_MONO).on_click(cx.listener(move |this, _, _, cx| {
-                        f(this);
-                        cx.notify();
-                    })),
-                );
-            }
-            div()
-                .flex()
-                .flex_col()
-                .gap(s(8.))
-                .child(tag(label.to_uppercase()))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(s(8.))
-                        .child(button(SharedString::from(format!("{id}-dec")), "−").w(s(36.)).on_click(cx.listener(move |this, _, _, cx| {
-                            dec(this);
-                            cx.notify();
-                        })))
-                        .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(18.)).child(value))
-                        .child(button(SharedString::from(format!("{id}-inc")), "+").w(s(36.)).on_click(cx.listener(move |this, _, _, cx| {
-                            inc(this);
-                            cx.notify();
-                        }))),
-                )
-                .child(presets_row)
-        };
-        let exp_presets: Vec<(String, Box<dyn Fn(&mut Plate)>)> = [-3.0f32, -1.0, 0.0, 1.0, 3.0]
-            .into_iter()
-            .map(|v| (format!("{v:+}"), Box::new(move |p: &mut Plate| p.set_exposure(v)) as Box<dyn Fn(&mut Plate)>))
-            .collect();
-        let gamma_presets: Vec<(String, Box<dyn Fn(&mut Plate)>)> = [0.5f32, 1.0, 1.8, 2.2]
-            .into_iter()
-            .map(|v| (format!("{v:.1}"), Box::new(move |p: &mut Plate| p.gamma = v) as Box<dyn Fn(&mut Plate)>))
-            .collect();
-        div()
-            .p(s(18.))
-            .flex()
-            .flex_col()
-            .gap(s(22.))
-            .child(stepper(
-                "exp",
-                "Exposure (stops, scene-linear)",
-                format!("{:+.2}", self.exposure),
-                Box::new(|p| p.set_exposure(p.exposure - 0.25)),
-                Box::new(|p| p.set_exposure(p.exposure + 0.25)),
-                exp_presets,
-                cx,
-            ))
-            .child(stepper(
-                "gamma",
-                "Gamma (display)",
-                format!("{:.2}", self.gamma),
-                Box::new(|p| p.gamma = ((p.gamma - 0.1) * 10.0).round() / 10.0_f32.max(0.1)),
-                Box::new(|p| p.gamma = ((p.gamma + 0.1) * 10.0).round() / 10.0),
-                gamma_presets,
-                cx,
-            ))
-            .child(
-                div()
-                    .flex()
-                    .justify_between()
-                    .items_center()
-                    .child(tag(",  .  STEP EXPOSURE  ·  BACKSPACE RESETS"))
-                    .child(button("exp-reset", "Reset").on_click(cx.listener(|this, _, _, cx| {
-                        this.exposure = 0.0;
-                        this.gamma = 1.0;
-                        cx.notify();
-                    }))),
-            )
     }
 
     fn modal_compare(&mut self, cx: &mut Context<Self>) -> Div {

@@ -3,6 +3,7 @@
 mod bin;
 mod comments;
 mod modals;
+mod slider;
 mod topbar;
 mod transport;
 mod viewer;
@@ -312,6 +313,15 @@ impl Render for Plate {
             // Scrubbing follows the mouse anywhere in the window, not just
             // while the pointer stays over the thin timeline.
             .on_mouse_move(cx.listener(|this, ev: &gpui::MouseMoveEvent, _, cx| {
+                if let Drag::Slider(kind) = this.drag {
+                    if ev.pressed_button != Some(MouseButton::Left) {
+                        this.drag = Drag::None;
+                        return;
+                    }
+                    this.slide_to(kind, ev.position.x);
+                    cx.notify();
+                    return;
+                }
                 if matches!(this.drag, Drag::Scrub) {
                     if ev.pressed_button != Some(MouseButton::Left) {
                         this.drag = Drag::None;

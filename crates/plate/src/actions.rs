@@ -163,8 +163,8 @@ pub const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         &[
             ("R G B A Y", "Isolate channel (press again for RGB)"),
             ("C", "RGB"),
-            (", .", "Exposure −/+ ¼ stop"),
-            ("Backspace", "Reset exposure, gamma and channel"),
+            (", .", "Exposure −/+ ¼ stop (or drag the EXP slider)"),
+            ("Backspace", "Reset exposure, gamma and channel (double-click a slider resets it)"),
             ("F  H", "Fit · 100%"),
             ("−  =", "Zoom out / in (or scroll)"),
             ("P", "Pixel probe"),

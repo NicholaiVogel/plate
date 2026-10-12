@@ -37,7 +37,8 @@ subfolders. Encrypted DCPs (KDM) are not supported.
   That keeps the ACES 2.0 output transforms at playback speed (≈5 ms per 2K
   frame); error against the exact transform is well under one 8-bit code value
   except at ACES 2.0's hard clip to display white.
-- Viewer exposure (stops, scene-linear) and gamma (display) are part of the
+- Viewer exposure (stops, scene-linear) and gamma (display) are sliders in the
+  top bar: drag, scroll to nudge, double-click to reset. Both are part of the
   baked transform.
 
 ## Cache

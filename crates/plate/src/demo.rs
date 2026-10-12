@@ -40,7 +40,6 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                     "colorspace" => Modal::Colorspace,
                     "display" => Modal::Display,
                     "channel" => Modal::Channel,
-                    "exposure" => Modal::Exposure,
                     "compare" => Modal::Compare,
                     "settings" => Modal::Settings,
                     "help" => Modal::Help,
@@ -92,6 +91,7 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 _ => plate_core::display::Channel::Luma,
             }),
             "exposure" => app.set_exposure(arg.parse().unwrap_or(1.0)),
+            "gamma" => app.set_gamma(arg.parse().unwrap_or(1.0)),
             "zoom" => app.zoom_at(arg.parse().unwrap_or(2.0), None, window.scale_factor()),
             "pan" => app.pan = point(px(120.), px(40.)),
             "inout" => {
