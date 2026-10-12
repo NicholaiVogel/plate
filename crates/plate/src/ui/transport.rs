@@ -1,6 +1,6 @@
 use super::widgets::{icon_button, icon_button_colored, icon_sized, TipExt};
 use crate::app::{CounterMode, Drag, Plate};
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{canvas, div, fill, point, prelude::*, px, Bounds, Context, MouseButton, MouseDownEvent, Pixels, Window};
 
 /// Shared with the comment composer so their top edges line up.
@@ -214,7 +214,7 @@ impl Plate {
                             .items_center()
                             .rounded(s(theme::RADIUS))
                             .cursor_pointer()
-                            .font_family(FONT_MONO)
+                            .font_family(theme::font_mono())
                             .text_size(s(12.))
                             .text_color(theme::ink_muted())
                             .hover(|s| s.bg(theme::hover()).text_color(theme::ink()))
@@ -274,9 +274,9 @@ impl Plate {
                     .rounded(s(theme::RADIUS))
                     .cursor_pointer()
                     .hover(|s| s.bg(theme::hover()))
-                    .child(div().font_family(FONT_MONO).text_size(s(13.)).child(counter))
+                    .child(div().font_family(theme::font_mono()).text_size(s(13.)).child(counter))
                     .child(
-                        div().font_family(FONT_MONO).text_size(s(10.)).text_color(theme::ink_faint()).child(match self.counter {
+                        div().font_family(theme::font_mono()).text_size(s(10.)).text_color(theme::ink_faint()).child(match self.counter {
                             CounterMode::Frames => "FRAME",
                             CounterMode::Timecode => "TC",
                             CounterMode::Index => "COUNT",
@@ -306,7 +306,7 @@ impl Plate {
                         div()
                             .id("range")
                             .mr(s(8.))
-                            .font_family(FONT_MONO)
+                            .font_family(theme::font_mono())
                             .text_size(s(11.))
                             .text_color(theme::blue())
                             .cursor_pointer()

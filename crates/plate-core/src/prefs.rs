@@ -103,6 +103,8 @@ pub struct Prefs {
     pub disk_cache_gb: f32,
     pub guides: Guides,
     pub captions: CaptionStyle,
+    /// "auto" (SF Pro when installed), "sf" or "source".
+    pub ui_font: String,
 }
 
 impl Default for Prefs {
@@ -127,6 +129,7 @@ impl Default for Prefs {
             disk_cache_gb: 64.0,
             guides: Guides::default(),
             captions: CaptionStyle::default(),
+            ui_font: "auto".into(),
         }
     }
 }

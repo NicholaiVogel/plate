@@ -177,7 +177,8 @@ app id.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Bundled fonts (Inter Tight, DM Mono) are under the
-SIL Open Font License; their license texts sit next to them in
-`crates/plate/assets/fonts/`. `crates/plate/src/text_input.rs` is adapted from
+MIT, see [LICENSE](LICENSE). Bundled fonts (Source Sans 3, Source Code Pro)
+are under the SIL Open Font License; their license texts sit next to them in
+`crates/plate/assets/fonts/`. The interface uses SF Pro and SF Mono instead
+when they're installed (Settings → Interface font); those aren't bundled. `crates/plate/src/text_input.rs` is adapted from
 gpui's Apache-2.0 input example.

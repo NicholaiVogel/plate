@@ -27,8 +27,57 @@ pub fn s(v: f32) -> Pixels {
     px(v * ui_scale())
 }
 
-pub const FONT_UI: &str = "Inter Tight";
-pub const FONT_MONO: &str = "DM Mono";
+/// Interface typefaces. SF Pro (what Nicholai's Nuke is set to) when it's
+/// installed, otherwise Houdini's Source Sans with Source Code Pro, both
+/// bundled. Chosen at startup and from Settings.
+static FONTS: std::sync::RwLock<(&'static str, &'static str)> = std::sync::RwLock::new((SOURCE_SANS, SOURCE_CODE));
+
+pub const SF_PRO: &str = "SF Pro Text";
+pub const SF_MONO: &str = "SF Mono";
+pub const SOURCE_SANS: &str = "Source Sans 3";
+pub const SOURCE_CODE: &str = "Source Code Pro";
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FontChoice {
+    SfPro,
+    SourceSans,
+}
+
+pub fn set_fonts(choice: FontChoice) {
+    let pair = match choice {
+        FontChoice::SfPro => (SF_PRO, SF_MONO),
+        FontChoice::SourceSans => (SOURCE_SANS, SOURCE_CODE),
+    };
+    if let Ok(mut f) = FONTS.write() {
+        *f = pair;
+    }
+}
+
+pub fn font_choice() -> FontChoice {
+    if font_ui() == SF_PRO { FontChoice::SfPro } else { FontChoice::SourceSans }
+}
+
+/// Whether SF Pro and SF Mono are installed (checked once at startup).
+pub static SF_AVAILABLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Applies the saved choice, falling back to Source Sans without SF Pro.
+pub fn apply_font_pref(pref: &str) {
+    let has_sf = SF_AVAILABLE.load(std::sync::atomic::Ordering::Relaxed);
+    let choice = match pref {
+        "source" => FontChoice::SourceSans,
+        _ if has_sf => FontChoice::SfPro,
+        _ => FontChoice::SourceSans,
+    };
+    set_fonts(choice);
+}
+
+pub fn font_ui() -> &'static str {
+    FONTS.read().map(|f| f.0).unwrap_or(SOURCE_SANS)
+}
+
+pub fn font_mono() -> &'static str {
+    FONTS.read().map(|f| f.1).unwrap_or(SOURCE_CODE)
+}
 
 pub fn paper() -> Rgba {
     rgb(0x101010)

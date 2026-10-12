@@ -1,6 +1,6 @@
 //! Small shared building blocks.
 
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{div, prelude::*, svg, AppContext, Div, ElementId, SharedString, Stateful, Svg};
 
 /// SVG icons don't inherit text color in gpui, so every icon carries its own.
@@ -35,11 +35,11 @@ pub fn icon_button_colored(id: impl Into<ElementId>, name: &str, active: bool, c
 
 /// Uppercase monospace label, the site's technical-tag voice.
 pub fn tag(text: impl Into<SharedString>) -> Div {
-    div().font_family(FONT_MONO).text_size(s(10.)).text_color(theme::ink_faint()).child(text.into())
+    div().font_family(theme::font_mono()).text_size(s(10.)).text_color(theme::ink_faint()).child(text.into())
 }
 
 pub fn mono(text: impl Into<SharedString>) -> Div {
-    div().font_family(FONT_MONO).text_size(s(12.)).child(text.into())
+    div().font_family(theme::font_mono()).text_size(s(12.)).child(text.into())
 }
 
 /// The joined strip that holds the top-bar controls.

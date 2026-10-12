@@ -2,7 +2,7 @@
 
 use super::widgets::tag;
 use crate::app::{Drag, Plate, SliderKind};
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{canvas, div, fill, point, prelude::*, px, Bounds, Context, MouseButton, MouseDownEvent, Pixels, ScrollWheelEvent};
 
 /// Gamma runs on a log scale so 1.0 sits in the middle of the track.
@@ -177,7 +177,7 @@ impl Plate {
                     .w(s(38.))
                     .flex()
                     .justify_end()
-                    .font_family(FONT_MONO)
+                    .font_family(theme::font_mono())
                     .text_size(s(12.))
                     .text_color(if changed { theme::ink() } else { theme::ink_muted() })
                     .child(text),

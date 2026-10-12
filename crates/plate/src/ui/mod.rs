@@ -11,7 +11,7 @@ pub mod widgets;
 
 use crate::actions::*;
 use crate::app::{CompareMode, Drag, Modal, Plate, Tool};
-use crate::theme::{self, s, FONT_UI};
+use crate::theme::{self, s};
 use gpui::{div, prelude::*, Context, ExternalPaths, Focusable, MouseButton, Window};
 use plate_core::display::Channel;
 use std::time::Instant;
@@ -313,7 +313,7 @@ impl Render for Plate {
             .flex_col()
             .bg(theme::paper())
             .text_color(theme::ink())
-            .font_family(FONT_UI)
+            .font_family(theme::font_ui())
             .text_size(s(13.))
             .key_context("Plate")
             .on_action(cx.listener(|this, _: &OpenFile, _, cx| this.prompt_open(false, cx)))

@@ -1,6 +1,6 @@
 use super::widgets::{chip, icon_button, icon_sized, segmented, TipExt};
 use crate::app::{CompareMode, Modal, Plate, SliderKind};
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{div, prelude::*, Context, FontWeight, Window};
 use plate_core::display::Channel;
 
@@ -92,7 +92,7 @@ impl Plate {
                     .justify_center()
                     .rounded(s(theme::RADIUS))
                     .cursor_pointer()
-                    .font_family(FONT_MONO)
+                    .font_family(theme::font_mono())
                     .text_size(s(13.))
                     .text_color(theme::ink_muted())
                     .hover(|s| s.bg(theme::hover()).text_color(theme::ink()))

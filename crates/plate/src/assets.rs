@@ -3,16 +3,16 @@
 use gpui::{AssetSource, SharedString};
 use std::borrow::Cow;
 
+/// Houdini's interface pair, bundled so plate looks right without SF Pro.
 pub const FONTS: &[&[u8]] = &[
-    include_bytes!("../assets/fonts/InterTight-Regular.ttf"),
-    include_bytes!("../assets/fonts/InterTight-Medium.ttf"),
-    include_bytes!("../assets/fonts/InterTight-SemiBold.ttf"),
-    include_bytes!("../assets/fonts/DMMono-Regular.ttf"),
-    include_bytes!("../assets/fonts/DMMono-Medium.ttf"),
+    include_bytes!("../assets/fonts/SourceSans3-Regular.ttf"),
+    include_bytes!("../assets/fonts/SourceSans3-Semibold.ttf"),
+    include_bytes!("../assets/fonts/SourceCodePro-Regular.ttf"),
+    include_bytes!("../assets/fonts/SourceCodePro-Medium.ttf"),
 ];
 
 /// Used when burning text annotations into saved stills.
-pub const BAKE_FONT: &[u8] = include_bytes!("../assets/fonts/InterTight-Medium.ttf");
+pub const BAKE_FONT: &[u8] = include_bytes!("../assets/fonts/SourceSans3-Semibold.ttf");
 
 const S: &str = r##"fill="none" stroke="#000" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round""##;
 

@@ -1,6 +1,6 @@
 use super::widgets::{icon_button, mono, tag, TipExt};
 use crate::app::{image_rect, CompareMode, Drag, Modal, Plate, Probe, SlotView, Tool};
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{
     canvas, div, fill, point, prelude::*, px, Bounds, ContentMask, Context, Corners, Hsla, MouseButton,
     MouseDownEvent, MouseMoveEvent, PathBuilder, Pixels, Point, ScrollWheelEvent, Window,
@@ -361,7 +361,7 @@ impl Plate {
                     .bg(theme::scrim())
                     .border_1()
                     .border_color(theme::hairline())
-                    .font_family(FONT_MONO)
+                    .font_family(theme::font_mono())
                     .text_size(s(11.))
                     .child(text)
             };
@@ -423,7 +423,7 @@ impl Plate {
                     .border_1()
                     .border_color(theme::hairline_strong())
                     .children(swatch.map(|c| div().size(s(28.)).bg(c).border_1().border_color(theme::hairline_strong())))
-                    .child(div().flex().flex_col().font_family(FONT_MONO).text_size(s(11.)).children(lines.into_iter().map(|l| div().child(l)))),
+                    .child(div().flex().flex_col().font_family(theme::font_mono()).text_size(s(11.)).children(lines.into_iter().map(|l| div().child(l)))),
             );
         }
 
@@ -489,7 +489,7 @@ impl Plate {
                             .absolute()
                             .right(s(2.))
                             .bottom(s(0.))
-                            .font_family(FONT_MONO)
+                            .font_family(theme::font_mono())
                             .text_size(s(8.))
                             .text_color(theme::ink_faint())
                             .child(tool.key()),
@@ -530,7 +530,7 @@ impl Plate {
                     .justify_center()
                     .rounded(s(theme::RADIUS))
                     .cursor_pointer()
-                    .font_family(FONT_MONO)
+                    .font_family(theme::font_mono())
                     .text_size(s(11.))
                     .text_color(if selected { theme::blue() } else { theme::ink_muted() })
                     .when(selected, |d| d.bg(theme::blue_soft()))

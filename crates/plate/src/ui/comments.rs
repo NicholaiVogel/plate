@@ -1,6 +1,6 @@
 use super::widgets::{icon, icon_button, icon_sized, tag, TipExt};
 use crate::app::Plate;
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{div, prelude::*, Context, FontWeight, MouseButton, SharedString, Window};
 
 fn ago(created: u64) -> String {
@@ -79,7 +79,7 @@ impl Plate {
                                     .rounded(s(3.))
                                     .bg(if focused { theme::blue() } else { theme::structure() })
                                     .text_color(if focused { theme::paper() } else { theme::ink() })
-                                    .font_family(FONT_MONO)
+                                    .font_family(theme::font_mono())
                                     .text_size(s(11.))
                                     .child(label),
                             )
@@ -203,7 +203,7 @@ impl Plate {
                                     .rounded(s(3.))
                                     .bg(theme::blue())
                                     .text_color(theme::paper())
-                                    .font_family(FONT_MONO)
+                                    .font_family(theme::font_mono())
                                     .text_size(s(11.))
                                     .child(self.frame_text(pinned)),
                             )

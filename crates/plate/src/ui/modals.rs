@@ -1,7 +1,7 @@
 use super::widgets::{button, icon, icon_button, primary_button, row, tag};
 use crate::actions::SHORTCUTS;
 use crate::app::{CompareMode, Modal, Plate};
-use crate::theme::{self, s, FONT_MONO};
+use crate::theme::{self, s};
 use gpui::{div, prelude::*, AnyElement, Context, Div, FontWeight, MouseButton, PathPromptOptions, SharedString, Window};
 use plate_core::display::Channel;
 use plate_core::media;
@@ -240,7 +240,7 @@ impl Plate {
                 row(SharedString::from(format!("ch-{}", ch.short())), selected)
                     .child(div().size(s(10.)).bg(swatch))
                     .child(div().flex_1().text_size(s(13.)).child(ch.label()))
-                    .child(div().font_family(FONT_MONO).text_size(s(11.)).text_color(theme::ink_faint()).child(key))
+                    .child(div().font_family(theme::font_mono()).text_size(s(11.)).text_color(theme::ink_faint()).child(key))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.channel = ch;
                         this.close_modal(window, cx);
@@ -404,7 +404,7 @@ impl Plate {
                     .flex()
                     .items_center()
                     .gap(s(10.))
-                    .child(div().w(s(110.)).font_family(FONT_MONO).text_size(s(11.)).child(fmt.to_uppercase()))
+                    .child(div().w(s(110.)).font_family(theme::font_mono()).text_size(s(11.)).child(fmt.to_uppercase()))
                     .child(div().flex_1().min_w_0().text_size(s(12.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(format!("{}  →  {}", choice.colorspace, choice.view)))
                     .child(icon_button(SharedString::from(format!("forget-{fmt}")), "x", false).size(s(24.)).on_click(cx.listener(move |this, _, _, cx| {
                         this.prefs.forget(&k, &f);
@@ -427,6 +427,32 @@ impl Plate {
             .overflow_y_scroll()
             .flex()
             .flex_col()
+            .child(section("INTERFACE FONT", None))
+            .child(
+                div()
+                    .p(s(6.))
+                    .flex()
+                    .flex_col()
+                    .child(
+                        toggle_row("font-sf", "SF Pro", if theme::SF_AVAILABLE.load(std::sync::atomic::Ordering::Relaxed) { "AS IN YOUR NUKE" } else { "NOT INSTALLED" }, theme::font_choice() == theme::FontChoice::SfPro)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                if theme::SF_AVAILABLE.load(std::sync::atomic::Ordering::Relaxed) {
+                                    this.prefs.ui_font = "sf".into();
+                                    this.prefs.save();
+                                    theme::apply_font_pref("sf");
+                                    cx.notify();
+                                }
+                            })),
+                    )
+                    .child(
+                        toggle_row("font-source", "Source Sans", "AS IN HOUDINI · BUNDLED", theme::font_choice() == theme::FontChoice::SourceSans).on_click(cx.listener(|this, _, _, cx| {
+                            this.prefs.ui_font = "source".into();
+                            this.prefs.save();
+                            theme::apply_font_pref("source");
+                            cx.notify();
+                        })),
+                    ),
+            )
             .child(section("OCIO CONFIG", Some(self.color.label.clone())))
             .child(configs)
             .child(section("REMEMBERED COLOR BY FORMAT", None))
@@ -440,7 +466,7 @@ impl Plate {
                     .items_center()
                     .gap(s(8.))
                     .child(button("cache-dec", "−").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb - 2.0, cx))))
-                    .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(16.)).child(format!("{gb:.0} GB")))
+                    .child(div().w(s(80.)).flex().justify_center().font_family(theme::font_mono()).text_size(s(16.)).child(format!("{gb:.0} GB")))
                     .child(button("cache-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_cache(this, this.prefs.cache_gb + 2.0, cx)))),
             )
             .child(section("DISK CACHE", Some(disk_detail)))
@@ -491,7 +517,7 @@ impl Plate {
                     .items_center()
                     .gap(s(8.))
                     .child(button("disk-dec", "−").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_disk_gb(this, this.prefs.disk_cache_gb - 16.0, cx))))
-                    .child(div().w(s(80.)).flex().justify_center().font_family(FONT_MONO).text_size(s(16.)).child(format!("{:.0} GB", self.prefs.disk_cache_gb)))
+                    .child(div().w(s(80.)).flex().justify_center().font_family(theme::font_mono()).text_size(s(16.)).child(format!("{:.0} GB", self.prefs.disk_cache_gb)))
                     .child(button("disk-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| set_disk_gb(this, this.prefs.disk_cache_gb + 16.0, cx)))),
             )
             .child(
@@ -515,7 +541,7 @@ impl Plate {
                     div()
                         .flex()
                         .gap(s(10.))
-                        .child(div().w(s(110.)).font_family(FONT_MONO).text_size(s(11.)).text_color(theme::blue()).child(*k))
+                        .child(div().w(s(110.)).font_family(theme::font_mono()).text_size(s(11.)).text_color(theme::blue()).child(*k))
                         .child(div().flex_1().text_size(s(12.)).text_color(theme::ink_muted()).child(*what)),
                 );
             }
@@ -614,7 +640,7 @@ impl Plate {
             let e = entry.clone();
             rows = rows.child(
                 row(("version", i), selected)
-                    .child(div().w(s(44.)).font_family(FONT_MONO).text_size(s(12.)).text_color(if selected { theme::blue() } else { theme::ink() }).child(format!("v{v:03}")))
+                    .child(div().w(s(44.)).font_family(theme::font_mono()).text_size(s(12.)).text_color(if selected { theme::blue() } else { theme::ink() }).child(format!("v{v:03}")))
                     .child(div().flex_1().min_w_0().text_size(s(12.)).text_color(theme::ink_muted()).whitespace_nowrap().overflow_hidden().text_ellipsis().child(scan_name(entry)))
                     .child(tag(age.to_uppercase()))
                     .when(selected, |d| d.child(icon("check").text_color(theme::blue())))
@@ -852,7 +878,7 @@ impl Plate {
                         this.caption_offset -= 1;
                         cx.notify();
                     })))
-                    .child(div().w(s(110.)).flex().justify_center().font_family(FONT_MONO).text_size(s(14.)).child(format!("{offset:+} frames")))
+                    .child(div().w(s(110.)).flex().justify_center().font_family(theme::font_mono()).text_size(s(14.)).child(format!("{offset:+} frames")))
                     .child(button("cap-off-inc", "+").w(s(36.)).on_click(cx.listener(|this, _, _, cx| {
                         this.caption_offset += 1;
                         cx.notify();

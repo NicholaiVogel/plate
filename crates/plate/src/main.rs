@@ -170,6 +170,12 @@ fn run_gui(req: ipc::OpenRequest) {
         }
         text_input::bind_keys(cx);
         actions::bind_keys(cx);
+        let has_sf = {
+            let names = cx.text_system().all_font_names();
+            names.iter().any(|n| n == theme::SF_PRO) && names.iter().any(|n| n == theme::SF_MONO)
+        };
+        theme::SF_AVAILABLE.store(has_sf, std::sync::atomic::Ordering::Relaxed);
+        theme::apply_font_pref(&plate_core::prefs::Prefs::load().ui_font);
 
         let bounds = Bounds::centered(None, size(px(1600.), px(960.)), cx);
         let window = cx
