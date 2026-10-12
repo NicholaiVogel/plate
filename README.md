@@ -169,6 +169,10 @@ scripts/build-macos.sh --debug     # faster development build
 open target/Plate.app
 ```
 
+The bundle includes a native icon at all macOS resolutions. Its source is
+`packaging/plate.svg`; regenerate the PNG and `.icns` with
+`scripts/build-icon.sh` (requires `rsvg-convert` from librsvg).
+
 The app is ad-hoc signed for local use. Distribution to other Macs requires
 Developer ID signing and notarization. Finder's Open With, document-opening
 events, native file dialogs, and Command-key shortcuts are supported.
