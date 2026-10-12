@@ -42,6 +42,12 @@ impl Plate {
                     chip("chip-channel", "Ch", self.channel.label(), self.channel != Channel::Rgb || self.modal == Some(Modal::Channel))
                         .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Channel, window, cx))),
                 )
+                .when_some(c.info.layer.clone().filter(|_| !c.info.layers.is_empty()), |d, layer| {
+                    d.child(
+                        chip("chip-layer", "Layer", layer, self.modal == Some(Modal::Layers))
+                            .on_click(cx.listener(|this, _, window, cx| this.open_modal(Modal::Layers, window, cx))),
+                    )
+                })
                 .child(self.render_slider(SliderKind::Exposure, cx))
                 .child(self.render_slider(SliderKind::Gamma, cx))
                 .child(

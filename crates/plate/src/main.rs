@@ -123,6 +123,9 @@ enum Command {
         /// Burn in the annotations saved on that frame.
         #[arg(long)]
         annotations: bool,
+        /// EXR layer to render (see `plate info`).
+        #[arg(long)]
+        layer: Option<String>,
     },
 }
 
@@ -133,8 +136,8 @@ fn main() {
     let code = match cli.command {
         Some(Command::Preview { paths, frame, compare, new }) => cli::preview(&paths, frame, compare.as_deref(), new),
         Some(Command::Info { path, json }) => cli::info(&path, json),
-        Some(Command::Still { path, frame, out, colorspace, display, view, exposure, annotations }) => {
-            cli::still(&path, frame, out, colorspace, display, view, exposure, annotations)
+        Some(Command::Still { path, frame, out, colorspace, display, view, exposure, annotations, layer }) => {
+            cli::still(&path, frame, out, colorspace, display, view, exposure, annotations, layer)
         }
         None => {
             let req = ipc::OpenRequest {

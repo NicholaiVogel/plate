@@ -37,6 +37,8 @@ pub struct Clip {
     pub remembered: bool,
     pub in_point: Option<u64>,
     pub out_point: Option<u64>,
+    /// Cache ids per EXR layer, so flipping back to a layer reuses its frames.
+    pub layer_ids: HashMap<String, u64>,
 }
 
 impl Clip {
@@ -112,6 +114,7 @@ pub enum Modal {
     Settings,
     Help,
     TextAnnotation,
+    Layers,
     Guides,
     Captions,
 }
@@ -302,6 +305,10 @@ pub struct Plate {
     pub annotation_input: Entity<TextInput>,
     pub toast: Option<Toast>,
 
+    /// The EXR layer last chosen, carried to other files that have it.
+    pub layer_pref: Option<String>,
+    /// While a new layer decodes, the previous layer's image stays up.
+    stale_from: Option<u64>,
     pub captions: Option<plate_core::captions::Captions>,
     /// Frames to shift captions by, for files that don't start at frame 0.
     pub caption_offset: i64,
@@ -394,6 +401,8 @@ impl Plate {
             search_input,
             annotation_input,
             toast: None,
+            layer_pref: None,
+            stale_from: None,
             captions: None,
             caption_offset: 0,
             presenter: Presenter::default(),
@@ -557,6 +566,47 @@ impl Plate {
         cx.notify();
     }
 
+    /// Shows another layer of the open EXR, keeping frame, range, color and
+    /// notes. Each layer keeps its own cache id.
+    pub fn switch_layer(&mut self, name: &str) {
+        let Some(mut old) = self.clip.take() else { return };
+        if old.info.layer.as_deref() == Some(name) || !old.info.layers.iter().any(|l| l == name) {
+            self.clip = Some(old);
+            return;
+        }
+        if let Some(current) = old.info.layer.clone() {
+            old.layer_ids.insert(current, old.info.id);
+        }
+        let id = *old.layer_ids.entry(name.to_string()).or_insert_with(media::new_id);
+        let Some(source) = old.source.with_layer(name, id) else {
+            self.clip = Some(old);
+            return;
+        };
+        let tx = self.frame_ready_tx.clone();
+        let loader = Loader::new(source.clone(), self.cache.clone(), move |_| {
+            let _ = tx.unbounded_send(());
+        });
+        self.stale_from = Some(old.info.id);
+        let info = source.info().clone();
+        let Clip { notes, choice, remembered, in_point, out_point, layer_ids, .. } = old;
+        self.clip = Some(Clip { source, info, loader, notes, choice, remembered, in_point, out_point, layer_ids });
+        self.layer_pref = Some(name.to_string());
+        self.probe = None;
+        self.reconfigure_loaders();
+        self.sync_loaders();
+    }
+
+    pub fn step_layer(&mut self, delta: i32) {
+        let Some(clip) = &self.clip else { return };
+        let layers = &clip.info.layers;
+        if layers.is_empty() {
+            return;
+        }
+        let at = clip.info.layer.as_ref().and_then(|l| layers.iter().position(|x| x == l)).unwrap_or(0);
+        let next = layers[(at as i32 + delta).rem_euclid(layers.len() as i32) as usize].clone();
+        self.switch_layer(&next);
+    }
+
     /// Replaces the open sequence with a re-scanned one in place: same frame,
     /// range, color, notes and playback. When only the end moved the cache
     /// is kept, since every index still means the same frame.
@@ -585,8 +635,21 @@ impl Plate {
             self.presenter.clear();
         }
         let info = source.info().clone();
-        let Clip { notes, choice, remembered, .. } = old;
-        self.clip = Some(Clip { source, info, loader, notes, choice, remembered, in_point, out_point });
+        // Keep showing the same layer of the longer sequence.
+        let source = match &old.info.layer {
+            Some(l) if source.info().layer.as_ref() != Some(l) => source.with_layer(l, source.info().id).unwrap_or(source),
+            _ => source,
+        };
+        let loader = if Arc::ptr_eq(loader.source(), &source) {
+            loader
+        } else {
+            let tx = self.frame_ready_tx.clone();
+            Loader::new(source.clone(), self.cache.clone(), move |_| {
+                let _ = tx.unbounded_send(());
+            })
+        };
+        let Clip { notes, choice, remembered, layer_ids, .. } = old;
+        self.clip = Some(Clip { source, info, loader, notes, choice, remembered, in_point, out_point, layer_ids });
         self.frame = frame;
         self.reconfigure_loaders();
         self.sync_loaders();
@@ -604,7 +667,7 @@ impl Plate {
             let _ = tx.unbounded_send(());
         });
         let notes = Notes::load(&info);
-        let mut clip = Clip { source, info, loader, notes, choice, remembered, in_point: None, out_point: None };
+        let mut clip = Clip { source, info, loader, notes, choice, remembered, in_point: None, out_point: None, layer_ids: HashMap::new() };
         self.configure_loader(&mut clip, 1);
         clip
     }
@@ -629,7 +692,11 @@ impl Plate {
         clip.loader.set_playhead(0, 0);
         self.captions = find_captions(&clip.info);
         self.caption_offset = 0;
+        let carry_layer = self.layer_pref.clone().filter(|l| clip.info.layers.contains(l) && clip.info.layer.as_ref() != Some(l));
         self.clip = Some(clip);
+        if let Some(l) = carry_layer {
+            self.switch_layer(&l);
+        }
         self.reconfigure_loaders();
         cx.notify();
     }
@@ -1057,7 +1124,7 @@ impl Plate {
         self.prefetch_display(slot, &lut, cx);
         match &self.presenter.shown[slot] {
             // Hold the previous frame of the same clip while this one decodes.
-            Some((k, img)) if k.clip == key.clip => SlotView::Image(img.clone()),
+            Some((k, img)) if k.clip == key.clip || (slot == 0 && Some(k.clip) == self.stale_from) => SlotView::Image(img.clone()),
             _ => SlotView::Loading,
         }
     }

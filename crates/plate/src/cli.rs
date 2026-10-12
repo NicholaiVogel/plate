@@ -151,6 +151,7 @@ pub fn info(path: &str, json: bool) -> i32 {
                 "config": cm.label,
             },
             "comments": { "total": notes.comments.len(), "open": open_notes, "sidecar": info.notes_path },
+            "layers": info.layers,
         });
         println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
     } else {
@@ -168,6 +169,12 @@ pub fn info(path: &str, json: bool) -> i32 {
             if remembered { "remembered for this format" } else { "default" }
         );
         println!("  comments  {} open, {} total", open_notes, notes.comments.len());
+        if !info.layers.is_empty() {
+            println!("  layers ({})", info.layers.len());
+            for l in &info.layers {
+                println!("    {l}");
+            }
+        }
     }
     0
 }
@@ -182,10 +189,17 @@ pub fn still(
     view: Option<String>,
     exposure: f32,
     annotations: bool,
+    layer: Option<String>,
 ) -> i32 {
     let run = || -> anyhow::Result<PathBuf> {
         let p = absolute(path).ok_or_else(|| anyhow::anyhow!("bad path"))?;
-        let source = media::open(&p)?;
+        let mut source = media::open(&p)?;
+        if let Some(name) = &layer {
+            let id = source.info().id;
+            source = source.with_layer(name, id).ok_or_else(|| {
+                anyhow::anyhow!("no layer {name:?}; layers: {}", source.info().layers.join(", "))
+            })?;
+        }
         let info = source.info().clone();
         let label = frame.unwrap_or(info.first_frame);
         let last = info.first_frame + info.frame_count as i64 - 1;
@@ -220,7 +234,8 @@ pub fn still(
         let out = out.unwrap_or_else(|| {
             let stem = info.name.split([' ', '#', '[']).next().unwrap_or("frame").trim_end_matches(['.', '_']).to_string();
             let stem = Path::new(&stem).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or(stem);
-            PathBuf::from(format!("{stem}_{label}.png"))
+            let layer = layer.as_deref().map(|l| format!("_{}", l.replace([' ', '/', '.'], "_"))).unwrap_or_default();
+            PathBuf::from(format!("{stem}{layer}_{label}.png"))
         });
         plate_core::bake::save_still(&out, &image, &shapes, Some(crate::assets::BAKE_FONT))?;
         Ok(out.canonicalize().unwrap_or(out))

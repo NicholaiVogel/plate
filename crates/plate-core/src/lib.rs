@@ -9,6 +9,7 @@ pub mod color;
 pub mod disk;
 pub mod display;
 pub mod frame;
+pub mod layers;
 pub mod loader;
 pub mod lut;
 pub mod media;

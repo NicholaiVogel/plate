@@ -295,6 +295,76 @@ OiioReadInfo oiio_read_rgba_half(rust::Str path, rust::Slice<uint16_t> out,
   return info;
 }
 
+rust::Vec<OiioPart> oiio_parts(rust::Str path) {
+  auto in = open_or_throw(s(path));
+  rust::Vec<OiioPart> parts;
+  for (int sub = 0; in->seek_subimage(sub, 0); ++sub) {
+    const auto &spec = in->spec();
+    OiioPart part;
+    part.subimage = (uint32_t)sub;
+    part.name = rust::String(spec.get_string_attribute("oiio:subimagename"));
+    for (const auto &c : spec.channelnames)
+      part.channels.push_back(rust::String(c));
+    parts.push_back(std::move(part));
+  }
+  in->close();
+  return parts;
+}
+
+OiioReadInfo oiio_read_channels_half(rust::Str path, uint32_t subimage, rust::Slice<const int32_t> map,
+                                     rust::Slice<uint16_t> out, uint32_t width, uint32_t height) {
+  if (map.size() != 4)
+    throw std::runtime_error("channel map must have 4 entries");
+  auto in = open_or_throw(s(path));
+  if (!in->seek_subimage((int)subimage, 0))
+    throw std::runtime_error("no subimage " + std::to_string(subimage));
+  const auto &spec = in->spec();
+  const int w = spec.width, h = spec.height;
+  const int fw = spec.full_width > 0 ? spec.full_width : w;
+  const int fh = spec.full_height > 0 ? spec.full_height : h;
+  if ((uint32_t)fw != width || (uint32_t)fh != height)
+    throw std::runtime_error("image size differs from the rest of the sequence");
+  if (out.size() < (size_t)fw * fh * 4)
+    throw std::runtime_error("output buffer too small");
+
+  // A layer's channels are adjacent in an EXR, so read only that block.
+  int lo = spec.nchannels, hi = -1;
+  for (int k = 0; k < 4; ++k) {
+    if (map[k] >= spec.nchannels)
+      throw std::runtime_error("channel index out of range");
+    if (map[k] >= 0) {
+      lo = std::min(lo, (int)map[k]);
+      hi = std::max(hi, (int)map[k]);
+    }
+  }
+  if (hi < 0)
+    throw std::runtime_error("empty channel map");
+  const int n = hi - lo + 1;
+  std::vector<uint16_t> src((size_t)w * h * n);
+  if (!in->read_image((int)subimage, 0, lo, hi + 1, OIIO::TypeDesc::HALF, src.data()))
+    throw std::runtime_error("OpenImageIO: " + in->geterror());
+  in->close();
+
+  const int ox = spec.x - spec.full_x, oy = spec.y - spec.full_y;
+  const uint16_t half_one = 0x3C00;
+  for (int y = 0; y < h; ++y) {
+    int ty = y + oy;
+    if (ty < 0 || ty >= fh) continue;
+    for (int x = 0; x < w; ++x) {
+      int tx = x + ox;
+      if (tx < 0 || tx >= fw) continue;
+      const uint16_t *px = &src[((size_t)y * w + x) * n];
+      uint16_t *o = &out[((size_t)ty * fw + tx) * 4];
+      for (int k = 0; k < 4; ++k)
+        o[k] = map[k] >= 0 ? px[map[k] - lo] : (k == 3 ? half_one : 0);
+    }
+  }
+  OiioReadInfo info;
+  info.has_alpha = map[3] >= 0;
+  info.pixel_aspect = spec.get_float_attribute("PixelAspectRatio", 1.0f);
+  return info;
+}
+
 rust::Vec<rust::String> oiio_extensions() {
   rust::Vec<rust::String> out;
   // Format: "openexr:exr,sxr,mxr;tiff:tif,tiff,..."

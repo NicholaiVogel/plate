@@ -6,6 +6,7 @@
 
 use crate::frame::Frame;
 use crate::media::{self, FormatKey, FrameReader, FrameSource, MediaInfo, MediaKind};
+use crate::layers::{layers_of, Layer};
 use crate::scan::{ext_of, Sequence};
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
@@ -16,6 +17,10 @@ pub const DEFAULT_SEQUENCE_FPS: f64 = 24.0;
 pub struct ImageSource {
     info: MediaInfo,
     frames: Frames,
+    /// Every layer in the file; empty for single-layer images.
+    layers: Vec<Layer>,
+    /// The layer to read; None reads the beauty through the fast path.
+    layer: Option<Layer>,
 }
 
 #[derive(Clone)]
@@ -73,14 +78,34 @@ fn build_info(kind: MediaKind, path: &Path, name: String, frame_count: u64, firs
         notes_path,
         // Only the `image` crate path keeps 8-bit data as bytes.
         bytes_per_pixel: if probe.bits <= 8 && matches!(ext_of(path).as_str(), "png" | "jpg" | "jpeg" | "tga" | "bmp" | "webp" | "gif") { 4 } else { 8 },
+        layers: Vec::new(),
+        layer: None,
     })
+}
+
+/// Layers of a multi-layer EXR (none for anything else), and the one to
+/// show first: the beauty, read through the fast path when it's plain RGBA.
+fn discover_layers(path: &Path, info: &mut MediaInfo) -> (Vec<Layer>, Option<Layer>) {
+    if !matches!(ext_of(path).as_str(), "exr" | "sxr" | "mxr") {
+        return (Vec::new(), None);
+    }
+    let layers = layers_of(path);
+    if layers.len() <= 1 && layers.first().is_none_or(|l| l.is_base()) {
+        return (Vec::new(), None);
+    }
+    info.layers = layers.iter().map(|l| l.name.clone()).collect();
+    let first = layers[0].clone();
+    info.layer = Some(first.name.clone());
+    let selected = (!first.is_base()).then_some(first);
+    (layers, selected)
 }
 
 impl ImageSource {
     pub fn still(path: &Path) -> Result<Self> {
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-        let info = build_info(MediaKind::Still, path, name, 1, 0, media::file_notes_path(path))?;
-        Ok(Self { info, frames: Frames::Still(path.to_path_buf()) })
+        let mut info = build_info(MediaKind::Still, path, name, 1, 0, media::file_notes_path(path))?;
+        let (layers, layer) = discover_layers(path, &mut info);
+        Ok(Self { info, frames: Frames::Still(path.to_path_buf()), layers, layer })
     }
 
     pub fn sequence(seq: Sequence) -> Result<Self> {
@@ -89,12 +114,21 @@ impl ImageSource {
         let stem = if stem.is_empty() { "sequence" } else { stem };
         // shot_v001.####.exr -> shot_v001.exr.plate.json
         let notes = seq.dir.join(format!("{stem}{}.plate.json", seq.suffix));
-        let info = build_info(MediaKind::Sequence, &first, seq.display_name(), seq.len(), seq.first, notes)?;
-        Ok(Self { info, frames: Frames::Sequence(seq) })
+        let mut info = build_info(MediaKind::Sequence, &first, seq.display_name(), seq.len(), seq.first, notes)?;
+        let (layers, layer) = discover_layers(&first, &mut info);
+        Ok(Self { info, frames: Frames::Sequence(seq), layers, layer })
     }
 
     pub(crate) fn set_id(&mut self, id: u64) {
         self.info.id = id;
+    }
+
+    /// Switches to a layer by name; false if there's no such layer.
+    pub fn select_layer(&mut self, name: &str) -> bool {
+        let Some(l) = self.layers.iter().find(|l| l.name == name).cloned() else { return false };
+        self.info.layer = Some(l.name.clone());
+        self.layer = (!l.is_base()).then_some(l);
+        true
     }
 
     pub fn sequence_info(&self) -> Option<&Sequence> {
@@ -111,7 +145,24 @@ impl FrameSource for ImageSource {
     }
 
     fn reader(&self) -> Result<Box<dyn FrameReader>> {
-        Ok(Box::new(ImageReader { frames: self.frames.clone() }))
+        Ok(Box::new(ImageReader {
+            frames: self.frames.clone(),
+            layer: self.layer.clone(),
+            size: (self.info.width, self.info.height),
+        }))
+    }
+
+    fn with_layer(&self, name: &str, id: u64) -> Option<media::Source> {
+        let mut copy = ImageSource {
+            info: self.info.clone(),
+            frames: self.frames.clone(),
+            layers: self.layers.clone(),
+            layer: self.layer.clone(),
+        };
+        copy.select_layer(name).then(|| {
+            copy.set_id(id);
+            std::sync::Arc::new(copy) as media::Source
+        })
     }
 
     fn parallelism(&self) -> usize {
@@ -124,13 +175,29 @@ impl FrameSource for ImageSource {
 
 struct ImageReader {
     frames: Frames,
+    layer: Option<Layer>,
+    size: (u32, u32),
 }
 
 impl FrameReader for ImageReader {
     fn read(&mut self, index: u64) -> Result<Frame> {
         let path = self.frames.path(index).ok_or_else(|| anyhow!("missing frame"))?;
-        read_image(&path)
+        match &self.layer {
+            Some(layer) => read_layer(&path, layer, self.size),
+            None => read_image(&path),
+        }
     }
+}
+
+/// Reads one layer's channels (only those) through OpenImageIO.
+pub fn read_layer(path: &Path, layer: &Layer, (w, h): (u32, u32)) -> Result<Frame> {
+    let mut f = Frame::new(w, h, layer.map[3] >= 0);
+    let half = f.half_mut();
+    // SAFETY: f16 is a transparent wrapper over u16.
+    let bits: &mut [u16] = unsafe { std::slice::from_raw_parts_mut(half.as_mut_ptr().cast(), half.len()) };
+    let info = plate_native::oiio_read_channels_half(&path.to_string_lossy(), layer.subimage, layer.map, bits, w, h)?;
+    f.pixel_aspect = if info.pixel_aspect > 0.0 { info.pixel_aspect } else { 1.0 };
+    Ok(f)
 }
 
 /// Decodes any supported still to half-float RGBA in display-window space.

@@ -82,6 +82,10 @@ pub struct MediaInfo {
     pub notes_path: PathBuf,
     /// Cached bytes per pixel: 4 for 8-bit sources, 8 for half float.
     pub bytes_per_pixel: u32,
+    /// EXR layers (AOVs), beauty first; empty when there's only one.
+    pub layers: Vec<String>,
+    /// The layer being shown, when the file has several.
+    pub layer: Option<String>,
 }
 
 impl MediaInfo {
@@ -109,6 +113,11 @@ pub trait FrameSource: Send + Sync {
     fn audio(&self) -> Vec<crate::audio::AudioSegment> {
         Vec::new()
     }
+
+    /// The same media showing another layer, under cache id `id`.
+    fn with_layer(&self, _name: &str, _id: u64) -> Option<Source> {
+        None
+    }
 }
 
 pub type Source = Arc<dyn FrameSource>;
@@ -121,6 +130,11 @@ pub(crate) fn file_notes_path(path: &Path) -> PathBuf {
 }
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+/// A fresh cache namespace, for callers that derive sources (layers).
+pub fn new_id() -> u64 {
+    next_id()
+}
 
 pub(crate) fn next_id() -> u64 {
     NEXT_ID.fetch_add(1, Ordering::Relaxed)

@@ -152,6 +152,8 @@ impl DcpSource {
             timecode: None,
             notes_path: dir.join("plate-notes.json"),
             bytes_per_pixel: 8,
+            layers: Vec::new(),
+            layer: None,
         };
         Ok(Self { info, reels: cpl.reels })
     }

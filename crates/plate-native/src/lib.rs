@@ -21,6 +21,12 @@ mod ffi {
         fps: f32,
     }
 
+    struct OiioPart {
+        subimage: u32,
+        name: String,
+        channels: Vec<String>,
+    }
+
     struct OiioReadInfo {
         has_alpha: bool,
         pixel_aspect: f32,
@@ -65,10 +71,19 @@ mod ffi {
         fn oiio_read_rgba_half(path: &str, out: &mut [u16], width: u32, height: u32)
             -> Result<OiioReadInfo>;
         fn oiio_extensions() -> Vec<String>;
+        fn oiio_parts(path: &str) -> Result<Vec<OiioPart>>;
+        fn oiio_read_channels_half(
+            path: &str,
+            subimage: u32,
+            map: &[i32],
+            out: &mut [u16],
+            width: u32,
+            height: u32,
+        ) -> Result<OiioReadInfo>;
     }
 }
 
-pub use ffi::{OiioProbe, OiioReadInfo};
+pub use ffi::{OiioPart, OiioProbe, OiioReadInfo};
 
 /// The OCIO config every fresh install starts with.
 pub const BUILTIN_STUDIO_CONFIG: &str = "ocio://studio-config-latest";
@@ -225,6 +240,17 @@ pub fn oiio_probe(path: &str) -> Result<OiioProbe> {
 /// buffer sized for the display window. `out` holds raw f16 bits.
 pub fn oiio_read_rgba_half(path: &str, out: &mut [u16], width: u32, height: u32) -> Result<OiioReadInfo> {
     Ok(ffi::oiio_read_rgba_half(path, out, width, height)?)
+}
+
+/// Channel names of every part (subimage) in a file, without reading pixels.
+pub fn oiio_parts(path: &str) -> Result<Vec<OiioPart>> {
+    Ok(ffi::oiio_parts(path)?)
+}
+
+/// Reads selected channels of one part into half-float RGBA. `map[k]` is the
+/// channel index feeding R, G, B, A, or -1 (zero, or one for alpha).
+pub fn oiio_read_channels_half(path: &str, subimage: u32, map: [i32; 4], out: &mut [u16], width: u32, height: u32) -> Result<OiioReadInfo> {
+    Ok(ffi::oiio_read_channels_half(path, subimage, &map, out, width, height)?)
 }
 
 /// Every file extension OpenImageIO has a reader for, lowercase without dots.

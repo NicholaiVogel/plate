@@ -17,6 +17,7 @@ impl Plate {
             Modal::Compare => ("Compare A/B", 480., self.modal_compare(cx).into_any_element()),
             Modal::Settings => ("Settings", 560., self.modal_settings(cx).into_any_element()),
             Modal::Help => ("Shortcuts", 720., self.modal_help().into_any_element()),
+            Modal::Layers => ("Layers", 460., self.modal_layers(cx).into_any_element()),
             Modal::Guides => ("Guides", 520., self.modal_guides(cx).into_any_element()),
             Modal::Captions => ("Captions", 480., self.modal_captions(cx).into_any_element()),
             Modal::TextAnnotation => ("Text annotation", 420., self.modal_text().into_any_element()),
@@ -588,6 +589,30 @@ fn mode_button_owned(id: SharedString, label: String, selected: bool) -> gpui::S
 }
 
 impl Plate {
+    fn modal_layers(&mut self, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
+        let (layers, current) = self
+            .clip
+            .as_ref()
+            .map(|c| (c.info.layers.clone(), c.info.layer.clone()))
+            .unwrap_or_default();
+        let mut list = div().id("layer-list").max_h(s(460.)).overflow_y_scroll().p(s(6.)).flex().flex_col();
+        for (i, name) in layers.into_iter().enumerate() {
+            let selected = current.as_ref() == Some(&name);
+            let n = name.clone();
+            list = list.child(
+                row(("layer", i), selected)
+                    .child(div().flex_1().min_w_0().text_size(s(13.)).whitespace_nowrap().overflow_hidden().text_ellipsis().child(name.clone()))
+                    .when(i == 0, |d| d.child(tag("BEAUTY")))
+                    .when(selected, |d| d.child(icon("check").text_color(theme::blue())))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.switch_layer(&n);
+                        this.close_modal(window, cx);
+                    })),
+            );
+        }
+        list.child(div().px(s(10.)).pt(s(8.)).pb(s(4.)).child(tag("ALT ← →  STEPS LAYERS · THE CHOICE CARRIES TO OTHER FILES")))
+    }
+
     fn modal_guides(&mut self, cx: &mut Context<Self>) -> Div {
         let g = self.prefs.guides.clone();
         let toggle = |id: &'static str, label: &str, detail: &str, on: bool, cx: &mut Context<Plate>, f: fn(&mut plate_core::prefs::Guides)| {

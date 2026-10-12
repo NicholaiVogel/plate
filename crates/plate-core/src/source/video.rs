@@ -169,6 +169,8 @@ impl VideoSource {
             timecode: p.timecode,
             notes_path: media::file_notes_path(path),
             bytes_per_pixel: if p.depth > 8 { 8 } else { 4 },
+            layers: Vec::new(),
+            layer: None,
         };
         Ok(Self { info, path: path.to_path_buf(), intra_only: p.intra_only })
     }

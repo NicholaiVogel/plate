@@ -44,6 +44,7 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                     "settings" => Modal::Settings,
                     "help" => Modal::Help,
                     "guides" => Modal::Guides,
+                    "layers" => Modal::Layers,
                     "captions" => Modal::Captions,
                     _ => continue,
                 };
@@ -122,6 +123,7 @@ fn apply(app: &mut Plate, state: &str, window: &mut Window, cx: &mut Context<Pla
                 window.bounds().size
             ),
             "quit" => cx.quit(),
+            "layer" => app.switch_layer(arg),
             "wait" => {}
             "toast" => app.show_toast("Saved /tmp/frame_1012.png".into()),
             _ => log::warn!("unknown demo step {name}"),

@@ -7,6 +7,7 @@ namespace plate {
 
 struct OiioProbe;
 struct OiioReadInfo;
+struct OiioPart;
 
 class Config {
 public:
@@ -47,5 +48,8 @@ OiioProbe oiio_probe(rust::Str path);
 OiioReadInfo oiio_read_rgba_half(rust::Str path, rust::Slice<uint16_t> out, uint32_t width,
                                  uint32_t height);
 rust::Vec<rust::String> oiio_extensions();
+rust::Vec<OiioPart> oiio_parts(rust::Str path);
+OiioReadInfo oiio_read_channels_half(rust::Str path, uint32_t subimage, rust::Slice<const int32_t> map,
+                                     rust::Slice<uint16_t> out, uint32_t width, uint32_t height);
 
 } // namespace plate
