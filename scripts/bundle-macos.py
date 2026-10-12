@@ -21,8 +21,12 @@ def bundle(binary, output):
         shutil.rmtree(output)
     macos = output / "Contents/MacOS"
     frameworks = output / "Contents/Frameworks"
+    resources = output / "Contents/Resources"
     macos.mkdir(parents=True)
     frameworks.mkdir()
+    resources.mkdir()
+    icon = Path(__file__).resolve().parent.parent / "packaging/Plate.icns"
+    shutil.copy2(icon, resources / "Plate.icns")
     executable = macos / "plate"
     shutil.copy2(binary, executable)
     pkg_config = os.environ.get("PKG_CONFIG", "pkg-config")
@@ -57,12 +61,13 @@ def bundle(binary, output):
                 run("/usr/bin/install_name_tool", "-id", f"@rpath/{name}", str(library))
                 queue.append((resolved, library))
             run("/usr/bin/install_name_tool", "-change", dependency, f"@rpath/{name}", str(destination))
-    version = run(str(binary), "--help").splitlines()[0].split()[-1]
+    version = run(str(binary), "--version").split()[-1]
     info = {
         "CFBundleExecutable": "plate",
         "CFBundleName": "Plate",
         "CFBundleDisplayName": "Plate",
         "CFBundleIdentifier": "org.plate.player",
+        "CFBundleIconFile": "Plate.icns",
         "CFBundlePackageType": "APPL",
         "CFBundleShortVersionString": version,
         "CFBundleVersion": version,
