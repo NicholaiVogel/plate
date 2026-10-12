@@ -34,6 +34,31 @@ impl SliderKind {
         }
     }
 
+    /// The increment a drag snaps to, like the f-stop and gamma sliders in
+    /// Nuke's viewer. Shift drags freely in fine steps.
+    fn step(self, fine: bool) -> f32 {
+        match (self, fine) {
+            (SliderKind::Exposure, false) => 0.25,
+            (SliderKind::Exposure, true) => 0.05,
+            (SliderKind::Gamma, false) => 0.1,
+            (SliderKind::Gamma, true) => 0.01,
+        }
+    }
+
+    fn snap(self, v: f32, fine: bool) -> f32 {
+        let step = self.step(fine);
+        (v / step).round() * step
+    }
+
+    /// Tick positions drawn under the track: whole stops, and the gamma
+    /// values people actually reach for.
+    fn ticks(self) -> &'static [f32] {
+        match self {
+            SliderKind::Exposure => &[-8., -7., -6., -5., -4., -3., -2., -1., 0., 1., 2., 3., 4., 5., 6., 7., 8.],
+            SliderKind::Gamma => &[0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    }
+
     fn label(self) -> &'static str {
         match self {
             SliderKind::Exposure => "EXP",
@@ -57,13 +82,18 @@ impl Plate {
         }
     }
 
-    /// Sets a slider from a mouse x position, snapping to neutral nearby.
-    pub fn slide_to(&mut self, kind: SliderKind, x: Pixels) {
+    /// Sets a slider from a mouse x position, snapped to its increment.
+    pub fn slide_to(&mut self, kind: SliderKind, x: Pixels, fine: bool) {
         let b = self.slider_bounds[kind as usize].get();
         let w = f32::from(b.size.width).max(1.0);
         let t = f32::from(x - b.origin.x) / w;
-        let snap = (t - kind.to_t(kind.neutral())).abs() < 0.03;
-        self.set_slider(kind, if snap { kind.neutral() } else { kind.from_t(t) });
+        self.set_slider(kind, kind.snap(kind.from_t(t), fine));
+    }
+
+    /// Steps a slider by whole increments (scroll wheel).
+    pub fn nudge(&mut self, kind: SliderKind, steps: i32, fine: bool) {
+        let v = self.slider_value(kind) + steps as f32 * kind.step(fine);
+        self.set_slider(kind, kind.snap(v, fine));
     }
 
     pub(super) fn render_slider(&self, kind: SliderKind, cx: &mut Context<Self>) -> impl IntoElement {
@@ -72,6 +102,7 @@ impl Plate {
         let t0 = kind.to_t(kind.neutral());
         let changed = (value - kind.neutral()).abs() > 1e-4;
         let bounds_cell = self.slider_bounds[kind as usize].clone();
+        let ticks: Vec<f32> = kind.ticks().iter().map(|v| kind.to_t(*v)).collect();
         let text = match kind {
             SliderKind::Exposure => format!("{value:+.2}"),
             SliderKind::Gamma => format!("{value:.2}"),
@@ -89,8 +120,12 @@ impl Plate {
                 let (a, b) = if t >= t0 { (t0, t) } else { (t, t0) };
                 let filled = Bounds::from_corners(point(x_at(a), cy - s(1.)), point(x_at(b), cy + s(1.)));
                 window.paint_quad(fill(filled, theme::blue()).corner_radii(s(1.)));
-                let tick = Bounds::centered_at(point(x_at(t0), cy), gpui::size(s(1.), s(8.)));
-                window.paint_quad(fill(tick, theme::ink_faint()));
+                for &tt in &ticks {
+                    let major = (tt - t0).abs() < 1e-4;
+                    let h = if major { s(10.) } else { s(5.) };
+                    let tick = Bounds { origin: point(x_at(tt), cy + s(3.)), size: gpui::size(s(1.), h - s(3.)) };
+                    window.paint_quad(fill(tick, if major { theme::ink_muted() } else { theme::ink_faint() }));
+                }
                 let knob = Bounds::centered_at(point(x_at(t), cy), gpui::size(s(6.), s(14.)));
                 window.paint_quad(fill(knob, theme::ink()).corner_radii(s(2.)));
             },
@@ -120,20 +155,20 @@ impl Plate {
                             this.drag = Drag::None;
                         } else {
                             this.drag = Drag::Slider(kind);
-                            this.slide_to(kind, ev.position.x);
+                            this.slide_to(kind, ev.position.x, ev.modifiers.shift);
                         }
                         cx.stop_propagation();
                         cx.notify();
                     }))
                     .on_scroll_wheel(cx.listener(move |this, ev: &ScrollWheelEvent, _, cx| {
-                        let dy = f32::from(ev.delta.pixel_delta(px(20.)).y);
-                        let v = this.slider_value(kind);
-                        let next = match kind {
-                            SliderKind::Exposure => v - dy / 200.0,
-                            SliderKind::Gamma => v * (1.0 - dy / 600.0),
-                        };
-                        this.set_slider(kind, next);
-                        cx.notify();
+                        // One increment per wheel notch; trackpads accumulate.
+                        this.slider_scroll -= f32::from(ev.delta.pixel_delta(px(20.)).y);
+                        let steps = (this.slider_scroll / 20.0).trunc() as i32;
+                        if steps != 0 {
+                            this.slider_scroll -= steps as f32 * 20.0;
+                            this.nudge(kind, steps, ev.modifiers.shift);
+                            cx.notify();
+                        }
                     }))
                     .child(track),
             )

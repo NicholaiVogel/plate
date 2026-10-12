@@ -318,7 +318,7 @@ impl Render for Plate {
                         this.drag = Drag::None;
                         return;
                     }
-                    this.slide_to(kind, ev.position.x);
+                    this.slide_to(kind, ev.position.x, ev.modifiers.shift);
                     cx.notify();
                     return;
                 }

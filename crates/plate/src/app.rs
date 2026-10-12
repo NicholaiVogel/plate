@@ -308,6 +308,7 @@ pub struct Plate {
     pub window_title: String,
     pub timeline_bounds: Rc<Cell<Bounds<Pixels>>>,
     pub slider_bounds: [Rc<Cell<Bounds<Pixels>>>; 2],
+    pub slider_scroll: f32,
     frame_ready_tx: futures::channel::mpsc::UnboundedSender<()>,
 }
 
@@ -395,6 +396,7 @@ impl Plate {
             stats: std::env::var("PLATE_STATS").is_ok().then(|| (Instant::now(), 0, u64::MAX)),
             timeline_bounds: Rc::new(Cell::new(Bounds::default())),
             slider_bounds: [Rc::new(Cell::new(Bounds::default())), Rc::new(Cell::new(Bounds::default()))],
+            slider_scroll: 0.0,
             frame_ready_tx: tx,
         };
         if let Some(w) = warning {
