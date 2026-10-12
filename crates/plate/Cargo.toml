@@ -1,0 +1,21 @@
+[package]
+name = "plate"
+version.workspace = true
+edition.workspace = true
+description = "A color-managed media player for VFX review"
+
+[[bin]]
+name = "plate"
+path = "src/main.rs"
+
+[dependencies]
+plate-core = { path = "../plate-core" }
+gpui = "0.2.2"
+anyhow.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+image = { version = "0.25", default-features = false }
+smallvec = "1"
+futures = "0.3"
+unicode-segmentation = "1"
+env_logger = "0.11"

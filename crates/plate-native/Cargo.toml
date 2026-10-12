@@ -1,0 +1,13 @@
+[package]
+name = "plate-native"
+version.workspace = true
+edition.workspace = true
+description = "C++ shims for OpenColorIO and OpenImageIO"
+
+[dependencies]
+cxx = "1"
+anyhow.workspace = true
+
+[build-dependencies]
+cxx-build = "1"
+pkg-config = "0.3"

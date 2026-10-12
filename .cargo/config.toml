@@ -1,0 +1,10 @@
+# Pin the system toolchain. A conda base env exports CC/CXX/*FLAGS pointing at
+# its own compiler and headers, which breaks linking against the system
+# OpenColorIO, OpenImageIO and FFmpeg.
+[env]
+CC = { value = "/usr/bin/cc", force = true }
+CXX = { value = "/usr/bin/c++", force = true }
+CFLAGS = { value = "", force = true }
+CXXFLAGS = { value = "", force = true }
+CPPFLAGS = { value = "", force = true }
+LDFLAGS = { value = "", force = true }

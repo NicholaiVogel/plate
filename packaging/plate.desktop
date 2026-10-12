@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=plate
+GenericName=Media Player
+Comment=Color-managed player for movies, image sequences, EXR and DCP review
+Exec=plate %U
+Icon=plate
+Terminal=false
+StartupWMClass=plate
+Categories=AudioVideo;Video;Player;Graphics;Viewer;
+Keywords=video;exr;dpx;dcp;ocio;aces;review;vfx;
+MimeType=video/mp4;video/quicktime;video/x-matroska;video/webm;video/x-msvideo;video/mpeg;video/x-m4v;video/mp2t;video/x-mpeg2;video/ogg;video/3gpp;video/x-flv;video/x-ms-wmv;video/vnd.avi;application/mxf;image/x-exr;image/x-dpx;image/x-cineon;inode/directory;
