@@ -76,15 +76,22 @@ struct Cli {
     /// Open a separate window instead of reusing the running plate.
     #[arg(long)]
     new: bool,
+    /// Add to the Review list instead of replacing it.
+    #[arg(long)]
+    add: bool,
 }
 
 #[derive(clap::Subcommand)]
 enum Command {
     /// Show media in plate and return immediately: hands it to the running
-    /// window (raising it), or starts plate in the background.
+    /// window (raising it), or starts plate in the background. Several paths,
+    /// from any folders, go to the Review list (stepped with Up/Down).
     Preview {
         #[arg(required = true)]
         paths: Vec<String>,
+        /// Add to the Review list instead of replacing it.
+        #[arg(long)]
+        add: bool,
         /// Frame to show, as numbered in plate.
         #[arg(long)]
         frame: Option<i64>,
@@ -137,7 +144,7 @@ fn main() {
     use clap::Parser;
     let cli = Cli::parse();
     let code = match cli.command {
-        Some(Command::Preview { paths, frame, compare, new }) => cli::preview(&paths, frame, compare.as_deref(), new),
+        Some(Command::Preview { paths, frame, compare, new, add }) => cli::preview(&paths, frame, compare.as_deref(), new, add),
         Some(Command::Info { path, json }) => cli::info(&path, json),
         Some(Command::Still { path, frame, out, colorspace, display, view, exposure, annotations, layer }) => {
             cli::still(&path, frame, out, colorspace, display, view, exposure, annotations, layer)
@@ -147,6 +154,7 @@ fn main() {
                 paths: cli.paths.iter().filter_map(|a| parse_arg(a)).collect(),
                 frame: cli.frame,
                 compare: cli.compare.as_deref().and_then(parse_arg),
+                add: cli.add,
             };
             // A double-clicked file goes to the plate that's already open.
             if !cli.new && !req.paths.is_empty() {
@@ -265,7 +273,7 @@ fn run_gui(req: ipc::OpenRequest) {
             while let Some(urls) = open_rx.next().await {
                 let paths = urls.iter().filter_map(|url| parse_arg(url)).collect();
                 let _ = window.update(cx, |app, window, cx| {
-                    app.open_paths(paths, cx);
+                    app.open_paths(paths, false, cx);
                     window.activate_window();
                     cx.notify();
                 });

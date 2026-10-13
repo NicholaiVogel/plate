@@ -292,8 +292,13 @@ impl Plate {
 
         let mut list = div().id("compare-list").max_h(s(320.)).overflow_y_scroll().p(s(6.)).flex().flex_col();
         {
-            let rows = self.visible_rows();
-            for (i, e) in rows.iter().map(|r| &r.entry).enumerate() {
+            // Review clips first (any folder), then the tree.
+            let rows: Vec<plate_core::scan::BinEntry> = self.review.iter().cloned().chain(self.visible_rows().into_iter().map(|r| r.entry)).collect();
+            let mut seen = std::collections::HashSet::new();
+            for (i, e) in rows.iter().enumerate() {
+                if !seen.insert(e.path.clone()) {
+                    continue;
+                }
                 if matches!(e.kind, EntryKind::Directory) || current_a.as_ref() == Some(&e.path) {
                     continue;
                 }
@@ -312,7 +317,7 @@ impl Plate {
                 })));
             }
         }
-        body.child(div().px(s(14.)).pt(s(10.)).child(tag("PICK B FROM THE BIN")))
+        body.child(div().px(s(14.)).pt(s(10.)).child(tag("PICK B · REVIEW LIST FIRST, THEN THE TREE")))
             .child(list)
             .child(
                 div()

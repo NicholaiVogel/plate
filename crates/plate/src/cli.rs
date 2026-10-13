@@ -18,11 +18,12 @@ fn absolute(arg: &str) -> Option<PathBuf> {
 }
 
 /// Hands media to the running plate, or starts one detached from this shell.
-pub fn preview(paths: &[String], frame: Option<i64>, compare: Option<&str>, new: bool) -> i32 {
+pub fn preview(paths: &[String], frame: Option<i64>, compare: Option<&str>, new: bool, add: bool) -> i32 {
     let req = OpenRequest {
         paths: paths.iter().filter_map(|a| absolute(a)).collect(),
         frame,
         compare: compare.and_then(absolute),
+        add,
     };
     for p in req.paths.iter().chain(req.compare.iter()) {
         if !p.exists() {
@@ -33,7 +34,13 @@ pub fn preview(paths: &[String], frame: Option<i64>, compare: Option<&str>, new:
     if !new {
         match ipc::send(&req) {
             Ok(true) => {
-                println!("plate: showing {} in the open window", names(&req.paths));
+                if req.add {
+                    println!("plate: added {} to the Review list", names(&req.paths));
+                } else if req.paths.len() > 1 {
+                    println!("plate: showing {} clips in the Review list ({})", req.paths.len(), names(&req.paths));
+                } else {
+                    println!("plate: showing {} in the open window", names(&req.paths));
+                }
                 return 0;
             }
             Ok(false) => {}
@@ -77,6 +84,9 @@ fn spawn_detached(req: &OpenRequest, new: bool) -> std::io::Result<u32> {
     }
     if new {
         cmd.arg("--new");
+    }
+    if req.add {
+        cmd.arg("--add");
     }
     cmd.stdin(std::process::Stdio::null()).stdout(log.try_clone()?).stderr(log);
     // SAFETY: setsid is async-signal-safe and touches no Rust state.

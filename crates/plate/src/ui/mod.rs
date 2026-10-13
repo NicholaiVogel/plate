@@ -46,7 +46,7 @@ impl Render for Plate {
             self.window_title = title;
         }
 
-        let show_bin = self.prefs.show_bin && self.bin.is_some();
+        let show_bin = self.prefs.show_bin && (self.bin.is_some() || !self.review.is_empty());
         let show_comments = self.prefs.show_comments && self.clip.is_some();
         let viewer_context = if self.drawing { "Viewer drawing" } else { "Viewer" };
 
@@ -340,7 +340,7 @@ impl Render for Plate {
                 }
             }))
             .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
-                this.open_paths(paths.paths().to_vec(), cx);
+                this.open_paths(paths.paths().to_vec(), false, cx);
                 this.focus_viewer(window);
             }))
             .drag_over::<ExternalPaths>(|s, _, _, _| s.bg(theme::structure()))

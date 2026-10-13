@@ -67,6 +67,19 @@ watched, so new renders, deleted versions and copied-in files appear as they
 happen, and a sequence that grows while it's open (a render in progress)
 extends in place without losing the frame, cache or notes.
 
+## Review list and compare
+
+Opening several clips at once (`plate preview a b c`, dropping files, or a
+multi-select in Open) puts them in the **Review** list at the top of the
+sidebar, whatever folders they're in. The first opens; ↑/↓ steps through the
+list while the open clip is on it. Each row shows the clip and its folder.
+Hover any tree row for **+** (add to Review) or **A/B** (compare as B); hover a
+Review row to compare or remove it. The list is kept between sessions.
+
+Compare works across folders: the A/B modal lists Review clips first, then the
+tree, and **Choose file…** takes anything on disk. The B label shows its
+folder when it differs from A's.
+
 ## Versions and layers
 
 - Versions: files that differ only by a standalone version token
@@ -116,7 +129,9 @@ Press `?` in the app for every shortcut.
 
 ```sh
 plate preview shot_v001.1001.exr --frame 1012     # show it in the open plate (or start one) and return
-plate preview v003.mov --compare v002.mov          # A/B
+plate preview v003.mov --compare v002.mov          # A/B, any two folders
+plate preview a/sh010.mov b/sh020.mov c/sh030.mov  # Review list: several shots, any folders
+plate preview --add d/sh040.mov                    # append to the Review list
 plate info review.mp4 [--json]                     # format, range, fps, color plate would use, comments
 plate still shot_v001.1001.exr --frame 1012 -o f.png [--exposure 1] [--annotations]
 plate clip.mov                                     # GUI; hands off to an open plate if there is one

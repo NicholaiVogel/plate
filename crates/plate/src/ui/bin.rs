@@ -26,7 +26,10 @@ impl Plate {
     }
 
     pub(super) fn render_bin(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let Some(bin) = &self.bin else { return div() };
+        let review = self.render_review(cx);
+        let Some(bin) = &self.bin else {
+            return div().w(s(280.)).flex_none().flex().flex_col().border_r_1().border_color(theme::hairline()).children(review);
+        };
         let title = bin.title.clone();
         let root = bin.dir.clone();
         let parent = root.as_ref().and_then(|d| d.parent().map(|p| p.to_path_buf()));
@@ -63,6 +66,7 @@ impl Plate {
             .flex_col()
             .border_r_1()
             .border_color(theme::hairline())
+            .children(review)
             .child(
                 div()
                     .h(s(44.))
@@ -152,7 +156,7 @@ impl Plate {
             _ => {}
         }
 
-        let mut line = row(("tree", i), selected).h(s(ROW_HEIGHT)).py(s(0.)).px(s(4.)).gap(s(0.));
+        let mut line = row(("tree", i), selected).group("tree-row").h(s(ROW_HEIGHT)).py(s(0.)).px(s(4.)).gap(s(0.));
         // Indent guides, one per level, joining across rows.
         for _ in 0..r.depth {
             line = line.child(div().w(s(INDENT)).h_full().flex_none().flex().justify_center().child(div().w(s(1.)).h_full().bg(theme::hairline())));
@@ -175,7 +179,18 @@ impl Plate {
                     .text_ellipsis()
                     .child(scan::version_name(e)),
             )
-            .children(note.map(|t| tag(t).flex_none().ml(s(6.)).when(warn, |d| d.text_color(theme::warn()))));
+            .children(note.map(|t| tag(t).flex_none().ml(s(6.)).when(warn, |d| d.text_color(theme::warn()))))
+            .when(e.is_playable(), |d| {
+                let (pin, ab) = (e.clone(), e.clone());
+                d.child(row_actions(i, cx, vec![
+                    ("plus", "Add to Review", Box::new(move |this: &mut Plate, cx: &mut Context<Plate>| {
+                        this.add_to_review(pin.clone());
+                        this.prefs.show_bin = true;
+                        cx.notify();
+                    })),
+                    ("compare", "Compare as B", Box::new(move |this: &mut Plate, cx: &mut Context<Plate>| this.compare_with(&ab, cx))),
+                ]))
+            });
 
         let entry = e.clone();
         let kind = r.kind.clone();
@@ -204,4 +219,117 @@ impl Plate {
             cx.notify();
         }))
     }
+
+    /// Clips pinned for review from any folder, above the tree.
+    fn render_review(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
+        if self.review.is_empty() {
+            return None;
+        }
+        let open_at = self.review_position();
+        let mut list = div().id("review-list").max_h(s(260.)).overflow_y_scroll().py(s(4.)).px(s(4.)).flex().flex_col();
+        for (i, e) in self.review.iter().enumerate() {
+            let selected = Some(i) == open_at;
+            // Two folder levels say where a shot lives (Bell/V005).
+            let place = e
+                .path
+                .parent()
+                .map(|p| {
+                    let parts: Vec<String> = p.components().rev().take(2).map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+                    parts.into_iter().rev().collect::<Vec<_>>().join("/")
+                })
+                .unwrap_or_default();
+            let glyph = match e.kind {
+                EntryKind::Sequence(_) => "layers",
+                EntryKind::Dcp => "projector",
+                EntryKind::Still => "image",
+                _ => "film",
+            };
+            let entry = e.clone();
+            let ab = e.clone();
+            list = list.child(
+                row(("review", i), selected)
+                    .group("tree-row")
+                    .h(s(ROW_HEIGHT + 10.))
+                    .py(s(0.))
+                    .px(s(6.))
+                    .gap(s(8.))
+                    .child(icon_sized(glyph, 14.).text_color(if selected { theme::blue() } else { theme::ink_faint() }))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_size(s(12.))
+                                    .text_color(if selected { theme::ink() } else { theme::ink_muted() })
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(scan::version_name(e)),
+                            )
+                            .child(div().text_size(s(11.)).text_color(theme::ink_faint()).whitespace_nowrap().overflow_hidden().text_ellipsis().child(place)),
+                    )
+                    .child(row_actions(1000 + i, cx, vec![
+                        ("compare", "Compare as B", Box::new(move |this: &mut Plate, cx: &mut Context<Plate>| this.compare_with(&ab, cx))),
+                        ("x", "Remove from Review", Box::new(move |this: &mut Plate, cx: &mut Context<Plate>| {
+                            this.remove_from_review(i);
+                            cx.notify();
+                        })),
+                    ]))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                        this.open_entry(&entry, cx);
+                        this.focus_viewer(window);
+                        cx.notify();
+                    })),
+            );
+        }
+        Some(
+            div()
+                .flex_none()
+                .flex()
+                .flex_col()
+                .border_b_1()
+                .border_color(theme::hairline())
+                .child(
+                    div()
+                        .h(s(36.))
+                        .px(s(10.))
+                        .flex()
+                        .items_center()
+                        .gap(s(6.))
+                        .child(div().font_weight(FontWeight::MEDIUM).child("Review"))
+                        .child(div().text_size(s(12.)).text_color(theme::ink_faint()).child(self.review.len().to_string()))
+                        .child(div().flex_1())
+                        .child(icon_button("review-clear", "trash", false).tip("Clear the Review list").on_click(cx.listener(|this, _, _, cx| {
+                            this.clear_review();
+                            cx.notify();
+                        }))),
+                )
+                .child(list),
+        )
+    }
+}
+
+type RowAction = Box<dyn Fn(&mut Plate, &mut Context<Plate>) + 'static>;
+
+/// Small buttons that appear on hover at the end of a row. They stop the
+/// press so the row underneath doesn't open.
+fn row_actions(i: usize, cx: &mut Context<Plate>, actions: Vec<(&'static str, &'static str, RowAction)>) -> impl IntoElement {
+    let mut bar = div().flex().flex_none().ml(s(4.)).gap(s(0.)).invisible().group_hover("tree-row", |st| st.visible());
+    for (k, (glyph, tip, action)) in actions.into_iter().enumerate() {
+        let action = std::rc::Rc::new(action);
+        bar = bar.child(
+            icon_button(gpui::SharedString::from(format!("row-{i}-{k}")), glyph, false)
+                .size(s(22.))
+                .tip(tip)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    action(this, cx);
+                })),
+        );
+    }
+    bar
 }

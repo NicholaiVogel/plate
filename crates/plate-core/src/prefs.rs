@@ -105,6 +105,8 @@ pub struct Prefs {
     pub captions: CaptionStyle,
     /// "auto" (SF Pro when installed), "sf" or "source".
     pub ui_font: String,
+    /// Clips pinned to the Review list, from any folder.
+    pub review: Vec<String>,
 }
 
 impl Default for Prefs {
@@ -130,6 +132,7 @@ impl Default for Prefs {
             guides: Guides::default(),
             captions: CaptionStyle::default(),
             ui_font: "auto".into(),
+            review: Vec::new(),
         }
     }
 }

@@ -14,6 +14,9 @@ pub struct OpenRequest {
     /// Frame number as shown in plate (e.g. 1012 for a comp sequence).
     pub frame: Option<i64>,
     pub compare: Option<PathBuf>,
+    /// Append to the Review list instead of replacing it.
+    #[serde(default)]
+    pub add: bool,
 }
 
 /// One socket per app id, so test instances never talk to the real one.

@@ -364,6 +364,8 @@ pub struct Plate {
     pub captions: Option<plate_core::captions::Captions>,
     /// Frames to shift captions by, for files that don't start at frame 0.
     pub caption_offset: i64,
+    /// Clips pinned for review from any folder, shown above the tree.
+    pub review: Vec<BinEntry>,
     pub presenter: Presenter,
     /// Viewer and timeline geometry from the last paint, for mouse mapping.
     pub viewer_bounds: Rc<Cell<Bounds<Pixels>>>,
@@ -464,6 +466,7 @@ impl Plate {
             stale_from: None,
             captions: None,
             caption_offset: 0,
+            review: Vec::new(),
             presenter: Presenter::default(),
             viewer_bounds: Rc::new(Cell::new(Bounds::default())),
             window_title: String::new(),
@@ -480,6 +483,8 @@ impl Plate {
             app.show_toast(w);
         }
         app.apply_disk_cache();
+        // The Review list comes back as it was, minus anything since deleted.
+        app.review = app.prefs.review.iter().filter_map(|p| entry_for_path(Path::new(p))).collect();
         app
     }
 
@@ -561,39 +566,95 @@ impl Plate {
 
     /// Several paths from the command line or a drop: one folder opens as a
     /// bin; several files become an ad-hoc bin.
-    pub fn open_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
-        match paths.len() {
-            0 => {}
-            1 => self.open_path(&paths[0], cx),
-            _ => {
-                let entries: Vec<BinEntry> = paths
-                    .iter()
-                    .filter_map(|p| {
-                        let name = p.file_name()?.to_string_lossy().to_string();
-                        let kind = if scan::is_dcp_dir(p) {
-                            EntryKind::Dcp
-                        } else if p.is_dir() {
-                            EntryKind::Directory
-                        } else if let Some(seq) = scan::is_image(p).then(|| scan::sequence_for(p)).flatten() {
-                            return Some(BinEntry { name: seq.display_name(), path: p.clone(), kind: EntryKind::Sequence(seq) });
-                        } else if scan::is_image(p) {
-                            EntryKind::Still
-                        } else {
-                            EntryKind::Video
-                        };
-                        Some(BinEntry { name, path: p.clone(), kind })
-                    })
-                    .collect();
-                let first = entries.iter().find(|e| e.is_playable()).cloned();
-                self.set_bin(
-                    Bin { dir: None, title: format!("{} items", entries.len()), entries, children: HashMap::new(), expanded: HashSet::new() },
-                    cx,
-                );
-                self.prefs.show_bin = true;
+    /// Opens what was asked for. One path behaves as before; several media
+    /// paths (from any folders) go to the Review list and the first opens.
+    /// A folder among them becomes the tree root. `add` appends to the list
+    /// instead of replacing it.
+    pub fn open_paths(&mut self, paths: Vec<PathBuf>, add: bool, cx: &mut Context<Self>) {
+        let paths: Vec<PathBuf> = paths.into_iter().map(|p| p.canonicalize().unwrap_or(p)).collect();
+        let (dirs, media): (Vec<PathBuf>, Vec<PathBuf>) = paths.into_iter().partition(|p| p.is_dir() && !scan::is_dcp_dir(p));
+        if media.len() <= 1 && !add {
+            match (dirs.first(), media.first()) {
+                (Some(d), None) => self.open_folder(d, cx),
+                (None, Some(m)) => self.open_path(m, cx),
+                (Some(d), Some(m)) => {
+                    if let Ok(entries) = scan::scan_dir(d) {
+                        self.set_bin(Bin::folder(d, entries), cx);
+                    }
+                    self.open_path(m, cx);
+                }
+                (None, None) => {}
+            }
+            return;
+        }
+        let entries: Vec<BinEntry> = media.iter().filter_map(|p| entry_for_path(p)).collect();
+        if let Some(d) = dirs.first() {
+            if let Ok(e) = scan::scan_dir(d) {
+                self.set_bin(Bin::folder(d, e), cx);
+            }
+        }
+        let first = entries.first().cloned();
+        if add {
+            for e in entries {
+                self.add_to_review(e);
+            }
+            if self.clip.is_none() {
                 if let Some(e) = first {
                     self.open_entry(&e, cx);
                 }
             }
+        } else {
+            self.review = entries;
+            self.save_review();
+            if let Some(e) = first {
+                self.open_entry(&e, cx);
+            }
+        }
+        self.prefs.show_bin = true;
+        self.reveal_pending = true;
+        cx.notify();
+    }
+
+    pub fn add_to_review(&mut self, entry: BinEntry) {
+        if !self.review.iter().any(|e| same_media(e, &entry)) {
+            self.review.push(entry);
+            self.save_review();
+        }
+    }
+
+    pub fn remove_from_review(&mut self, index: usize) {
+        if index < self.review.len() {
+            self.review.remove(index);
+            self.save_review();
+        }
+    }
+
+    pub fn clear_review(&mut self) {
+        self.review.clear();
+        self.save_review();
+    }
+
+    fn save_review(&mut self) {
+        self.prefs.review = self.review.iter().map(|e| e.path.to_string_lossy().to_string()).collect();
+        self.prefs.save();
+    }
+
+    /// Index of the open clip in the Review list.
+    pub fn review_position(&self) -> Option<usize> {
+        let clip = self.clip.as_ref()?;
+        self.review.iter().position(|e| entry_matches(e, &clip.info.path) || e.path == clip.info.path)
+    }
+
+    /// Makes `entry` the B side of an A/B compare.
+    pub fn compare_with(&mut self, entry: &BinEntry, cx: &mut Context<Self>) {
+        match media::open_entry(entry) {
+            Ok(s) => {
+                if self.compare.is_none() {
+                    self.compare_mode = CompareMode::Wipe;
+                }
+                self.set_compare(Some(s), cx);
+            }
+            Err(e) => self.show_toast(format!("{e:#}")),
         }
     }
 
@@ -1093,7 +1154,7 @@ impl Plate {
         });
         cx.spawn(async move |this, cx| match rx.await {
             Ok(Ok(Some(paths))) => {
-                let _ = this.update(cx, |app, cx| app.open_paths(paths, cx));
+                let _ = this.update(cx, |app, cx| app.open_paths(paths, false, cx));
             }
             Ok(Err(e)) => {
                 let _ = this.update(cx, |app, cx| {
@@ -1126,8 +1187,15 @@ impl Plate {
         .detach();
     }
 
-    /// Steps through playable rows in tree order (collapsed stacks count once).
+    /// Steps through the Review list when the open clip is on it, otherwise
+    /// through playable rows in tree order (collapsed stacks count once).
     pub fn step_clip(&mut self, delta: i32, cx: &mut Context<Self>) {
+        if let Some(at) = self.review_position() {
+            let n = self.review.len() as i32;
+            let entry = self.review[(at as i32 + delta).rem_euclid(n) as usize].clone();
+            self.open_entry(&entry, cx);
+            return;
+        }
         let rows = self.visible_rows();
         let playable: Vec<&BinEntry> = rows.iter().map(|r| &r.entry).filter(|e| e.is_playable()).collect();
         if playable.is_empty() {
@@ -1859,7 +1927,7 @@ impl Plate {
             }
         }
         if !req.paths.is_empty() {
-            self.open_paths(req.paths, cx);
+            self.open_paths(req.paths, req.add, cx);
         }
         if let Some(c) = req.compare {
             let source = media::open(&c).map_err(|e| format!("{e:#}"))?;
@@ -2073,6 +2141,32 @@ fn watch_dir(dir: &Path, cx: &mut Context<Plate>) -> Option<notify::RecommendedW
     })
     .detach();
     Some(watcher)
+}
+
+/// A bin entry for a media path from anywhere: a movie, a still, one frame of
+/// a sequence (the whole sequence), or a DCP folder.
+pub fn entry_for_path(p: &Path) -> Option<BinEntry> {
+    if !p.exists() {
+        return None;
+    }
+    let name = p.file_name()?.to_string_lossy().to_string();
+    let kind = if scan::is_dcp_dir(p) {
+        EntryKind::Dcp
+    } else if p.is_dir() {
+        return None;
+    } else if let Some(seq) = scan::is_image(p).then(|| scan::sequence_for(p)).flatten() {
+        return Some(BinEntry { name: seq.display_name(), path: p.to_path_buf(), kind: EntryKind::Sequence(seq) });
+    } else if scan::is_image(p) {
+        EntryKind::Still
+    } else {
+        EntryKind::Video
+    };
+    Some(BinEntry { name, path: p.to_path_buf(), kind })
+}
+
+/// Whether two entries are the same media (any frame of one sequence).
+fn same_media(a: &BinEntry, b: &BinEntry) -> bool {
+    a.path == b.path || entry_matches(a, &b.path)
 }
 
 /// Picks up `clip.srt` / `clip.vtt` (or a language variant) next to the media.

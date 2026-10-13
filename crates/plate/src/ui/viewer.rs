@@ -367,7 +367,17 @@ impl Plate {
             };
             layer = layer
                 .child(label(format!("A  {}", clip.info.name), false))
-                .child(label(format!("B  {}", b.info.name), true));
+                .child(label(
+                    // Say where B lives when it's from another folder.
+                    match (clip.info.path.parent(), b.info.path.parent()) {
+                        (pa, Some(pb)) if pa != Some(pb) => {
+                            let folder: Vec<String> = pb.components().rev().take(2).map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+                            format!("B  {}  ·  {}", b.info.name, folder.into_iter().rev().collect::<Vec<_>>().join("/"))
+                        }
+                        _ => format!("B  {}", b.info.name),
+                    },
+                    true,
+                ));
         }
 
         if let SlotView::Missing(err) = self.peek_slot(0) {

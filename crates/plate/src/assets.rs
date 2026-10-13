@@ -50,6 +50,7 @@ fn icon_body(name: &str) -> Option<String> {
         "compare" => format!(r#"<rect x="3" y="3" width="18" height="18" rx="2"/>{}"#, p(&["M12 3v18"])),
         "grid" => format!(r#"<rect x="3" y="3" width="18" height="18" rx="2"/>{}"#, p(&["M9 3v18", "M15 3v18", "M3 9h18", "M3 15h18"])),
         "captions" => format!(r#"<rect x="2.5" y="5" width="19" height="14" rx="2"/>{}"#, p(&["M10.5 10.2a2.2 2.2 0 1 0 0 3.6", "M17 10.2a2.2 2.2 0 1 0 0 3.6"])),
+        "plus" => p(&["M12 5v14", "M5 12h14"]),
         "collapse" => p(&["m7 20 5-5 5 5", "m7 4 5 5 5-5"]),
         "expand" => p(&["M15 3h6v6", "M9 21H3v-6", "M21 3l-7 7", "M3 21l7-7"]),
         "maximize" => p(&["M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3"]),
